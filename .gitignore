@@ -1,0 +1,21 @@
+# uv / virtualenv
+.venv/
+.venv.bak/
+.agent/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Env vars
+.env
+.env.*
+
+# IDE
+.idea/
+.vscode/

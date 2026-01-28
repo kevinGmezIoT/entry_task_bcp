@@ -1,0 +1,12 @@
+[
+    {
+        "policy_id": "FP -01",
+        "rule": "Monto > 3x promedio habitual y horario fuera de rango → CHALLENGE",
+        "version": "2025.1"
+    },
+    {
+        "policy_id": "FP -02",
+        "rule": "Transacción internacional y dispositivo nuevo → ESCALATE_TO_HUMAN",
+        "version": "2025.1"
+    }
+]
