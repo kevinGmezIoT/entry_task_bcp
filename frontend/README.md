@@ -48,14 +48,60 @@ Esto generará una carpeta `dist/` con archivos estáticos optimizados.
 
 ### 2. AWS S3 (Hosting de Archivos)
 - Crea un bucket en S3 (ej. `bc-fraud-frontend-prod`).
-- Sube el contenido de `dist/` al bucket.
-- Configura el bucket para "Static Website Hosting" o mantenlo privado y úsalo con CloudFront OAI/OAC (Recomendado por seguridad).
+- **Configuración Recomendada**:
+  - Mantén activada la opción **"Block all public access"** (Deseado para OAC).
+  - No actives "Static Website Hosting" si usas CloudFront con OAC.
+- **Subida de Archivos**:
+  - Sube el **contenido** de la carpeta `dist/` a la raíz del bucket.
+  - Asegúrate de que `index.html` esté en el primer nivel.
+
+#### Opción AWS CLI (Recomendada):
+```bash
+aws s3 sync dist/ s3://tu-nombre-de-bucket --delete
+```
 
 ### 3. AWS CloudFront (CDN & HTTPS)
-- Crea una distribución de CloudFront.
-- Configura el **Origin** apuntando al bucket de S3.
-- Configura los **Error Responses** para que cualquier error 404 devuelva `index.html` con status 200 (necesario para React Router).
-- (Opcional) Agrega un segundo Origin apuntando a tu **ALB/App Runner** del Backend para servir las APIs bajo el mismo dominio (ej. `/api/*`).
+Este es el método más seguro para servir la aplicación manteniendo el bucket privado.
+
+1.  **Crear Origen (Origin)**:
+    - **Origin domain**: Selecciona tu bucket (ej. `nombre.s3.us-east-2.amazonaws.com`).
+    - **Origin access**: Selecciona **"Origin access control settings (recommended)"**.
+    - Crea un nuevo OAC (mantén los valores por defecto).
+
+2.  **Configuración General**:
+    - **Default root object**: Escribe `index.html`. (Sin esto, verás un error XML al entrar a la raíz).
+
+3.  **Permisos en S3 (Bucket Policy)**:
+    - Tras crear la distribución, CloudFront te mostrará un mensaje para actualizar la política del bucket.
+    - Copia la política y pégala en **S3 -> Permissions -> Bucket Policy**. Debe verse así:
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "AllowCloudFrontServicePrincipalReadOnly",
+            "Effect": "Allow",
+            "Principal": {
+                "Service": "cloudfront.amazonaws.com"
+            },
+            "Action": "s3:GetObject",
+            "Resource": "arn:aws:s3:::TU-BUCKET-NOMBRE/*",
+            "Condition": {
+                "StringEquals": {
+                    "AWS:SourceArn": "arn:aws:cloudfront::TU-ID-CUENTA:distribution/TU-ID-DISTRIBUCION"
+                }
+            }
+        }
+    ]
+}
+```
+
+4.  **Manejo de Rutas (Error Pages)**:
+    - Ve a la pestaña **Error pages** -> **Create custom error response**.
+    - Error code: `404: Not Found`.
+    - Response page path: `/index.html`.
+    - HTTP Response code: `200: OK`.
+    - *(Esto permite que React Router maneje las rutas al recargar la página)*.
 
 ### 4. AWS Route 53
 - Crea un registro A (Alias) apuntando a la distribución de CloudFront.
