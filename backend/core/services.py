@@ -1,5 +1,10 @@
+import requests
+import logging
 from datetime import datetime
+from django.conf import settings
 from core.models import CustomerProfile, Transaction, DecisionRecord, AuditEvent, HumanReviewCase
+
+logger = logging.getLogger(__name__)
 
 class SignalAnalysisService:
     @staticmethod
@@ -36,50 +41,78 @@ class SignalAnalysisService:
         return signals
 
 class DecisionService:
-    @staticmethod
-    def get_decision(signals: list, transaction: Transaction):
-        # Simplificamos la lógica de decisión para el paso 3
-        # En pasos posteriores esto podría involucrar a los agentes
-        if not signals:
-            return "APPROVE", 0.95
-        
-        if len(signals) >= 3:
-            return "BLOCK", 0.85
-        
-        if "Monto fuera de rango" in signals and len(signals) >= 2:
-            return "ESCALATE_TO_HUMAN", 0.60
-            
-        if len(signals) > 0:
-            return "CHALLENGE", 0.70
-            
-        return "APPROVE", 0.90
-
     @classmethod
     def apply_decision(cls, transaction: Transaction):
-        signals = SignalAnalysisService.analyze_transaction(transaction)
-        decision, confidence = cls.get_decision(signals, transaction)
+        # 1. Prepare data for the multi-agent orchestrator
+        customer = transaction.customer
+        payload = {
+            "transaction": {
+                "id": transaction.transaction_id,
+                "amount": str(transaction.amount),
+                "country": transaction.country,
+                "device_id": transaction.device_id,
+                "timestamp": transaction.timestamp.isoformat(),
+                "merchant_id": transaction.merchant_id
+            },
+            "customer": {
+                "id": customer.customer_id,
+                "usual_amount_avg": str(customer.usual_amount_avg),
+                "usual_hours": customer.usual_hours,
+                "usual_countries": customer.usual_countries,
+                "usual_devices": customer.usual_devices
+            }
+        }
+
+        # 2. Call the Flask Orchestrator
+        # Default to localhost if not specified in settings
+        orchestrator_url = getattr(settings, "ORCHESTRATOR_URL", "http://192.168.2.11:5001/orchestrate")
         
-        # Create DecisionRecord
+        try:
+            logger.info(f"Calling orchestrator for transaction {transaction.transaction_id}")
+            response = requests.post(orchestrator_url, json=payload, timeout=180)
+            response.raise_for_status()
+            agent_result = response.json()
+        except Exception as e:
+            logger.exception(f"Error calling multi-agent orchestrator: {str(e)}")
+            # Fallback to local deterministic logic if agents-flask is down
+            return cls._apply_fallback_decision(transaction)
+
+        # 3. Parse Agent Results
+        decision = agent_result.get("decision", "ESCALATE_TO_HUMAN")
+        confidence = agent_result.get("confidence", 0.0)
+        signals = agent_result.get("signals", [])
+        citations_internal = agent_result.get("citations_internal", [])
+        citations_external = agent_result.get("citations_external", [])
+        exp_customer = agent_result.get("explanation_customer", "Revisando transacción...")
+        exp_audit = agent_result.get("explanation_audit", "Esperando respuesta de agentes.")
+
+        # 4. Create DecisionRecord
         record, _ = DecisionRecord.objects.update_or_create(
             transaction=transaction,
             defaults={
                 'decision': decision,
                 'confidence': confidence,
                 'signals': signals,
-                'explanation_customer': cls._generate_customer_explanation(decision, signals),
-                'explanation_audit': cls._generate_audit_explanation(decision, signals)
+                'citations_internal': citations_internal,
+                'citations_external': citations_external,
+                'explanation_customer': exp_customer,
+                'explanation_audit': exp_audit
             }
         )
         
-        # Create Audit Event
+        # 5. Create Audit Event
         AuditEvent.objects.create(
             transaction=transaction,
-            event_type="DECISION_MADE",
-            description=f"Decision {decision} made with confidence {confidence}",
-            metadata={"signals": signals}
+            event_type="MULTI_AGENT_DECISION",
+            description=f"Multi-agent decision: {decision} with confidence {confidence}",
+            metadata={
+                "trace_id": agent_result.get("trace_id"),
+                "signals": signals,
+                "agent_path": "Context -> Behavior -> RAG -> Web -> Aggregation -> Debate -> Arbiter -> Explainability"
+            }
         )
         
-        # Create HITL case if escalated
+        # 6. Create HITL case if escalated
         if decision == "ESCALATE_TO_HUMAN":
             HumanReviewCase.objects.get_or_create(
                 transaction=transaction,
@@ -88,21 +121,28 @@ class DecisionService:
             
         return record
 
-    @staticmethod
-    def _generate_customer_explanation(decision, signals):
-        if decision == "APPROVE":
-            return "Su transacción ha sido aprobada con éxito."
-        if decision == "CHALLENGE":
-            return "Su transacción requiere una validación adicional por seguridad."
-        if decision == "BLOCK":
-            return "Por su seguridad, esta transacción ha sido bloqueada preventivamente."
-        if decision == "ESCALATE_TO_HUMAN":
-            return "Estamos revisando su transacción. Por favor, espere unos momentos."
-        return ""
+    @classmethod
+    def _apply_fallback_decision(cls, transaction: Transaction):
+        """Fallback logic if the multi-agent system is unavailable."""
+        from core.services import SignalAnalysisService
+        signals = SignalAnalysisService.analyze_transaction(transaction)
+        
+        # Basic heuristic
+        if len(signals) >= 3:
+            decision, confidence = "BLOCK", 0.8
+        elif len(signals) >= 1:
+            decision, confidence = "CHALLENGE", 0.6
+        else:
+            decision, confidence = "APPROVE", 0.9
 
-    @staticmethod
-    def _generate_audit_explanation(decision, signals):
-        if not signals:
-            return "No se detectaron señales de riesgo. Comportamiento habitual."
-        signals_str = ", ".join(signals)
-        return f"Decisión {decision} basada en las señales: {signals_str}."
+        record, _ = DecisionRecord.objects.update_or_create(
+            transaction=transaction,
+            defaults={
+                'decision': decision,
+                'confidence': confidence,
+                'signals': signals,
+                'explanation_customer': "Su transacción está siendo procesada.",
+                'explanation_audit': f"Fallback decision due to orchestrator timeout. Signals: {signals}"
+            }
+        )
+        return record

@@ -210,7 +210,7 @@ def decision_arbiter_agent(state: AgentState):
     confidence = result.confidence
     
     # HITL Logic: Scalate if confidence is low
-    if confidence < 0.6:
+    if confidence < 0.8:
         print(f" -> Confidence too low ({confidence}). Escalating to human.")
         final_decision = "ESCALATE_TO_HUMAN"
     
