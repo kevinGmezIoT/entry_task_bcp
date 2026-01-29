@@ -1,0 +1,17 @@
+[project]
+name = "agents-flask"
+version = "0.1.0"
+description = "Multi-agent fraud detection orchestration service"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "boto3>=1.42.37",
+    "flask>=3.1.2",
+    "langchain>=1.2.7",
+    "langchain-aws>=1.2.1",
+    "langgraph>=1.0.7",
+    "pydantic-settings>=2.12.0",
+]
+
+[tool.uv]
+managed = true

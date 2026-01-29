@@ -19,3 +19,5 @@ __pycache__/
 # IDE
 .idea/
 .vscode/
+
+challenge.md

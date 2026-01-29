@@ -3,6 +3,7 @@ name = "fraud-backend"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
+    "boto3>=1.42.37",
     "django==4.2.*",
     "djangorestframework==3.15.*",
     "psycopg[binary]>=3.3.2",
