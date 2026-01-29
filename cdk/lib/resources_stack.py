@@ -61,10 +61,18 @@ class ResourcesStack(Stack):
             auto_delete_objects=True
         )
 
+        # 5. S3 Bucket for RAG Policies
+        self.policy_bucket = s3.Bucket(self, "PolicyBucket",
+            removal_policy=RemovalPolicy.DESTROY,
+            auto_delete_objects=True,
+            block_public_access=s3.BlockPublicAccess.BLOCK_ALL
+        )
+
         # Exporting values
         CfnOutput(self, "VpcId", value=self.vpc.vpc_id, export_name="EntryVpcId-" + environment)
         CfnOutput(self, "ClusterName", value=self.cluster.cluster_name, export_name="EntryClusterName-" + environment)
         CfnOutput(self, "BackendRepoName", value=self.backend_repository.repository_name, export_name="EntryBackendRepoName-" + environment)
         CfnOutput(self, "AgentsRepoName", value=self.agents_repository.repository_name, export_name="EntryAgentsRepoName-" + environment)
         CfnOutput(self, "FrontendBucketName", value=self.frontend_bucket.bucket_name, export_name="EntryFrontendBucketName-" + environment)
+        CfnOutput(self, "PolicyBucketName", value=self.policy_bucket.bucket_name, export_name="EntryPolicyBucketName-" + environment)
 

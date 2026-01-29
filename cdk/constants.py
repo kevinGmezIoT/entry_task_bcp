@@ -2,19 +2,16 @@ stack = 'EntryTaskBcp'
 aws_account = '495297548455'
 configuration_by_environment = {
     'DEV': {
-        'region': 'us-east-1',
+        'region': 'us-east-2',
     },
     'PROD': {
-        'region': 'us-east-1',
+        'region': 'us-east-2',
     }
 }
 
 repository_owner = 'kevinGmezIoT'
 repository = 'entry_task_bcp'
 repository_branch = 'master'
-
-reevalua_api_notification_url = 'https://reevalua.com/victoria/notify-customer-success'
-
 
 def configuration(environment: str):
     global configuration_by_environment

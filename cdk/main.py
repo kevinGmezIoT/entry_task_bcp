@@ -25,6 +25,7 @@ app_stack = AppStack(app, stack_name(environment),
     backend_repository=resources_stack.backend_repository,
     agents_repository=resources_stack.agents_repository,
     frontend_bucket=resources_stack.frontend_bucket,
+    policy_bucket=resources_stack.policy_bucket,
     env=CdkEnvironment(account=aws_account, region=aws_region(environment)),
 )
 
@@ -37,8 +38,10 @@ pipeline_stack = PipelineStack(app, pipeline_stack_name(environment),
     backend_repository=resources_stack.backend_repository,
     agents_repository=resources_stack.agents_repository,
     frontend_bucket=resources_stack.frontend_bucket,
+    policy_bucket=resources_stack.policy_bucket,
     env=CdkEnvironment(account=aws_account, region=aws_region(environment)),
 )
+
 
 app.synth()
 

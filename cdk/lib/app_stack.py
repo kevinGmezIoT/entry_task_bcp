@@ -26,6 +26,7 @@ class AppStack(Stack):
                  backend_repository=None,
                  agents_repository=None,
                  frontend_bucket=None,
+                 policy_bucket=None,
                  **kwargs
                  ) -> None:
         super().__init__(scope, id, **kwargs)
@@ -41,8 +42,7 @@ class AppStack(Stack):
         if cluster is None:
             cluster = ecs.Cluster.from_cluster_attributes(self, "ClusterLookup",
                 cluster_name=Fn.import_value("EntryClusterName-" + environment),
-                vpc=vpc,
-                security_groups=[]
+                vpc=vpc
             )
         
         if backend_repository is None:
@@ -60,8 +60,13 @@ class AppStack(Stack):
                 Fn.import_value("EntryFrontendBucketName-" + environment)
             )
 
-        # 2. Define Environment Variables and Secrets
+        if policy_bucket is None:
+            policy_bucket = s3.Bucket.from_bucket_name(self, "PolicyBucketLookup",
+                Fn.import_value("EntryPolicyBucketName-" + environment)
+            )
 
+        # 2. Define Environment Variables and Secrets
+        
         # Common Secrets (Bedrock, OpenAI, etc) - From Secrets Manager
         common_secrets = {
             "TAVILY_API_KEY": ecs.Secret.from_secrets_manager(
@@ -72,23 +77,33 @@ class AppStack(Stack):
             ),
         }
 
-        # Backend specific env from Parameter Store
+        backend_secrets = {
+            **common_secrets,
+            "DJANGO_SECRET_KEY": ecs.Secret.from_secrets_manager(
+                secretsmanager.Secret.from_secret_name_v2(self, "DjangoSecret", "DJANGO_SECRET_KEY")
+            ),
+        }
+
+        # Backend specific env from Parameter Store + Dynamic Resources
         backend_env = {
             "DJANGO_SETTINGS_MODULE": "config.settings",
             "DJANGO_DEBUG": ssm.StringParameter.value_for_string_parameter(self, f"/entry-task/{environment}/django-debug"),
             "DATABASE_URL": ssm.StringParameter.value_for_string_parameter(self, f"/entry-task/{environment}/database-url"),
-            "AGENTS_SERVICE_URL": "http://localhost:5001", # Will be adjusted if needed for inter-service comms
+            "S3_POLICY_BUCKET": policy_bucket.bucket_name,
+            "AWS_REGION": Stack.of(self).region,
+            "AGENTS_SERVICE_URL": "http://agents.local:5001", # Placeholder, will be updated if using Service Discovery
         }
 
         # Agents specific env from Parameter Store
         agents_env = {
             "BEDROCK_KB_ID": ssm.StringParameter.value_for_string_parameter(self, f"/entry-task/{environment}/bedrock-kb-id"),
             "BEDROCK_DS_ID": ssm.StringParameter.value_for_string_parameter(self, f"/entry-task/{environment}/bedrock-ds-id"),
+            "AWS_REGION": Stack.of(self).region,
         }
 
         # 3. Define Fargate Services
 
-        # Use ApplicationLoadBalancedFargateService pattern for the Backend (main entry point)
+        # Backend Service with Load Balancer
         backend_service = ecs_patterns.ApplicationLoadBalancedFargateService(
             self, "BackendService",
             cluster=cluster,
@@ -105,22 +120,19 @@ class AppStack(Stack):
                 image=ecs.ContainerImage.from_ecr_repository(backend_repository, "latest"),
                 container_port=8000,
                 environment=backend_env,
-                secrets=common_secrets
+                secrets=backend_secrets,
+                log_driver=ecs.LogDrivers.aws_logs(stream_prefix="Backend")
             ),
             health_check_grace_period=Duration.seconds(60)
         )
 
-        # Add the Agents container to the same Task Definition (Sidecar pattern for simplicity/latency)
-        # or as a separate service. Given the user request, separate service is more "standard" for microservices.
-        # But for this challenge, a multi-container task is often easier to manage.
-        # Let's go with a separate service for the agents to showcase microservices.
-        
-        agents_service_task_def = ecs.FargateTaskDefinition(self, "AgentsTaskDef",
+        # Agents Service (Separate Service)
+        agents_task_def = ecs.FargateTaskDefinition(self, "AgentsTaskDef",
             cpu=512,
             memory_limit_mib=1024
         )
         
-        agents_container = agents_service_task_def.add_container("AgentsContainer",
+        agents_task_def.add_container("AgentsContainer",
             image=ecs.ContainerImage.from_ecr_repository(agents_repository, "latest"),
             environment=agents_env,
             secrets=common_secrets,
@@ -130,18 +142,22 @@ class AppStack(Stack):
 
         agents_service = ecs.FargateService(self, "AgentsService",
             cluster=cluster,
-            task_definition=agents_service_task_def,
+            task_definition=agents_task_def,
             desired_count=1,
-            assign_public_ip=True # In public subnet without NAT
+            assign_public_ip=True,
+            cloud_map_options=ecs.CloudMapOptions(
+                name="agents",
+                dns_record_type=ec2.DnsRecordType.A,
+                dns_ttl=Duration.seconds(60)
+            )
         )
+
 
         # Allow Backend to talk to Agents
+        # Note: In a real prod environment, we would use CloudMap/Service Discovery.
+        # Since we are in a challenge, let's keep it simple: the backend will talk to agents via their private IP
+        # as they are in the same VPC. For more robust discovery, we'd use 'agents.local'.
         agents_service.connections.allow_from(backend_service.service, ec2.Port.tcp(5001))
-
-        # Update Backend env with actual Agents URL
-        backend_service.task_definition.default_container.add_environment(
-            "AGENTS_SERVICE_URL", f"http://{agents_service.cloud_map_service.service_name if agents_service.cloud_map_service else agents_service.connections.security_groups[0].instance_id}:5001"
-        )
 
         # Health checks
         backend_service.target_group.configure_health_check(
@@ -173,21 +189,22 @@ class AppStack(Stack):
             ]
         )
 
-        # Outputs
+        # 5. IAM Permissions and Outputs
+        # Grant permissions to Backend for S3 and Bedrock
+        policy_bucket.grant_read_write(backend_service.task_definition.task_role)
+        
+        bedrock_policy = iam.PolicyStatement(
+            actions=[
+                "bedrock:InvokeModel", 
+                "bedrock:Retrieve", 
+                "bedrock:RetrieveAndGenerate",
+                "bedrock:StartIngestionJob"
+            ],
+            resources=["*"]
+        )
+        backend_service.task_definition.task_role.add_to_policy(bedrock_policy)
+        agents_task_def.task_role.add_to_policy(bedrock_policy)
+
         CfnOutput(self, "BackendURL", value=f"http://{backend_service.load_balancer.load_balancer_dns_name}")
         CfnOutput(self, "FrontendURL", value=f"https://{distribution.distribution_domain_name}")
-
-        # 5. IAM Permissions for Bedrock
-        backend_service.task_definition.task_role.add_to_policy(
-            iam.PolicyStatement(
-                actions=["bedrock:InvokeModel", "bedrock:Retrieve", "bedrock:RetrieveAndGenerate"],
-                resources=["*"]
-            )
-        )
-        agents_service_task_def.task_role.add_to_policy(
-            iam.PolicyStatement(
-                actions=["bedrock:InvokeModel", "bedrock:Retrieve", "bedrock:RetrieveAndGenerate"],
-                resources=["*"]
-            )
-        )
-
+        CfnOutput(self, "PolicyBucketName", value=policy_bucket.bucket_name)

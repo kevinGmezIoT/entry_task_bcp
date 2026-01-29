@@ -28,12 +28,15 @@ Antes del primer despliegue, debes configurar los siguientes valores en AWS:
 - `GITHUB-TOKEN`: Tu token de GitHub.
 - `TAVILY_API_KEY`: API Key para búsqueda web.
 - `LANGCHAIN_API_KEY`: API Key para LangSmith/LangChain.
+- `DJANGO_SECRET_KEY`: La clave secreta de tu aplicación Django.
 
 ### Parameter Store (Ejemplo para entorno DEV)
 - `/entry-task/DEV/django-debug`: `1` o `0`.
 - `/entry-task/DEV/database-url`: URL de conexión a PostgreSQL (ej. `postgresql://user:pass@host:5432/db`).
 - `/entry-task/DEV/bedrock-kb-id`: ID de tu Knowledge Base de Bedrock.
 - `/entry-task/DEV/bedrock-ds-id`: ID de tu Data Source de Bedrock.
+
+
 
 ---
 
@@ -90,8 +93,48 @@ Una vez que el Pipeline esté creado, cualquier push a la rama `master` de tu re
 
 ---
 
-## 6. Verificación
+## 6. Verificación y Operaciones Post-Despliegue
 
-- Obtén la URL del Frontend desde la salida de CloudFormation o la consola de CloudFront.
-- Verifica el estado de los servicios en la consola de ECS.
-- Revisa los logs en CloudWatch para asegurar que los agentes están recibiendo las peticiones.
+Una vez que el Pipeline termine (puedes monitorearlo en la consola de **AWS CodePipeline**), ejecuta estos pasos para validar todo:
+
+### A. Verificar Salud de los Servicios
+Obtén las URLs de los outputs de CloudFormation o de la pestaña "Outputs" del stack `App` en CDK.
+
+- **Frontend**: Abre la URL de CloudFront en tu navegador.
+- **Backend Health**: `curl https://<TU_URL_ALB>/api/health/`
+- **Agents Health**: `curl https://<TU_URL_ALB>:5001/health` (si el puerto está expuesto) o verifica en ECS CloudWatch Logs.
+
+### B. Sincronización Manual de RAG (Políticas)
+Si modificas `data/fraud_policies.json` y quieres actualizar el RAG en la nube sin esperar al pipeline (o como primer paso):
+
+```bash
+# Entrar al contenedor del Backend en ECS (usando AWS CLI)
+# Primero obtén el ID del cluster y la tarea
+aws ecs list-tasks --cluster EntryClusterBcp-DEV
+
+# Ejecutar los comandos de Django
+aws ecs execute-command --cluster EntryClusterBcp-DEV \
+    --task <TASK_ID> \
+    --container BackendContainer \
+    --interactive \
+    --command "python manage.py seed_data"
+
+aws ecs execute-command --cluster EntryClusterBcp-DEV \
+    --task <TASK_ID> \
+    --container BackendContainer \
+    --interactive \
+    --command "python manage.py ingest_rag"
+```
+
+> [!IMPORTANT]
+> Para usar `execute-command`, debes tener instalada la extensión `session-manager-plugin` de AWS CLI en tu máquina local.
+
+### C. Verificar Logs
+Si algo falla, la fuente de verdad son los logs:
+- **CloudWatch Logs**: Busca los grupos `/aws/ecs/EntryTaskBcp...` para ver la salida de Django y Flask.
+
+### D. Probar Flujo Completo
+Usa el script de prueba local ajustando la URL:
+```bash
+python verify_step_8.py --url https://<TU_URL_ALB>
+```

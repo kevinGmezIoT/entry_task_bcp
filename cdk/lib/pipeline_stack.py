@@ -24,6 +24,7 @@ class PipelineStack(Stack):
         backend_repository=None,
         agents_repository=None,
         frontend_bucket=None,
+        policy_bucket=None,
         **kwargs
     ) -> None:
         super().__init__(scope, id, **kwargs)
@@ -34,6 +35,7 @@ class PipelineStack(Stack):
         self.__backend_repository = backend_repository
         self.__agents_repository = agents_repository
         self.__frontend_bucket = frontend_bucket
+        self.__policy_bucket = policy_bucket
         self.createPipeline();
         self.createSourceStage();
         self.createBuildStage();
