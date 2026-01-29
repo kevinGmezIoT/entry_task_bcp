@@ -45,6 +45,7 @@ def orchestrate():
     initial_state = {
         "transaction": transaction,
         "customer": customer,
+        "transaction_id": tx_id,
         "signals": [],
         "internal_evidence": [],
         "external_evidence": [],
@@ -58,7 +59,15 @@ def orchestrate():
     
     try:
         # Run LangGraph Orchestration
-        config = {"configurable": {"thread_id": trace_id}}
+        # Tagging for LangSmith
+        config = {
+            "configurable": {"thread_id": trace_id},
+            "metadata": {
+                "transaction_id": tx_id,
+                "customer_id": customer.get("id", "N/A")
+            },
+            "tags": ["fraud-detection-v1", f"tx-{tx_id}"]
+        }
         result = graph.invoke(initial_state, config)
         
         logger.info(f"[{trace_id}] === END Orchestration. Decision: {result['decision']} (Conf: {result['confidence']}) ===")

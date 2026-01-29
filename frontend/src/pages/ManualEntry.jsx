@@ -7,13 +7,15 @@ function ManualEntry() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
+        transaction_id: '',
         customer_id: 'C-1001',
         amount: 50.00,
         currency: 'PEN',
         country: 'PE',
         channel: 'WEB',
         device_id: 'DEV-99',
-        merchant_id: 'M-500'
+        merchant_id: 'M-500',
+        timestamp: new Date().toISOString().slice(0, 16)
     });
 
     const handleSubmit = async (e) => {
@@ -45,6 +47,19 @@ function ManualEntry() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                         <label className="text-sm font-semibold text-gray-600 flex items-center gap-2">
+                            ID Transacción (Opcional)
+                        </label>
+                        <input
+                            name="transaction_id"
+                            placeholder="Autogenerado si está vacío"
+                            value={formData.transaction_id}
+                            onChange={handleChange}
+                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-bcp-blue/20 outline-none"
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-sm font-semibold text-gray-600 flex items-center gap-2">
                             <User size={14} /> ID Cliente
                         </label>
                         <input
@@ -60,14 +75,26 @@ function ManualEntry() {
                         <label className="text-sm font-semibold text-gray-600 flex items-center gap-2">
                             <DollarSign size={14} /> Monto
                         </label>
-                        <input
-                            type="number"
-                            name="amount"
-                            value={formData.amount}
-                            onChange={handleChange}
-                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-bcp-blue/20 outline-none"
-                            required
-                        />
+                        <div className="flex gap-2">
+                            <select
+                                name="currency"
+                                value={formData.currency}
+                                onChange={handleChange}
+                                className="px-2 py-3 rounded-xl border border-gray-200 outline-none bg-gray-50"
+                            >
+                                <option value="PEN">PEN</option>
+                                <option value="USD">USD</option>
+                                <option value="EUR">EUR</option>
+                            </select>
+                            <input
+                                type="number"
+                                name="amount"
+                                value={formData.amount}
+                                onChange={handleChange}
+                                className="flex-1 px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-bcp-blue/20 outline-none"
+                                required
+                            />
+                        </div>
                     </div>
 
                     <div className="space-y-2">
@@ -101,6 +128,46 @@ function ManualEntry() {
                             <option value="MOBILE">App Móvil</option>
                             <option value="POS">POS Físico</option>
                         </select>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-sm font-semibold text-gray-600 flex items-center gap-2">
+                            <Smartphone size={14} /> ID Dispositivo
+                        </label>
+                        <input
+                            name="device_id"
+                            value={formData.device_id}
+                            onChange={handleChange}
+                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-bcp-blue/20 outline-none"
+                            required
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-sm font-semibold text-gray-600 flex items-center gap-2">
+                            ID Comercio
+                        </label>
+                        <input
+                            name="merchant_id"
+                            value={formData.merchant_id}
+                            onChange={handleChange}
+                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-bcp-blue/20 outline-none"
+                            required
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-sm font-semibold text-gray-600 flex items-center gap-2">
+                            Fecha/Hora
+                        </label>
+                        <input
+                            type="datetime-local"
+                            name="timestamp"
+                            value={formData.timestamp}
+                            onChange={handleChange}
+                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-bcp-blue/20 outline-none"
+                            required
+                        />
                     </div>
                 </div>
 

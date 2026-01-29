@@ -224,7 +224,7 @@ A continuación tienes una **secuencia de procedimientos (en orden)** para const
 **Herramientas (AWS)**
 
 * CloudWatch Logs + CloudWatch Metrics
-* AWS X-Ray (trazas) o OpenTelemetry → CloudWatch
+* Langsmith (trazas)
 
 ---
 

@@ -49,6 +49,7 @@ class DecisionService:
             "transaction": {
                 "id": transaction.transaction_id,
                 "amount": str(transaction.amount),
+                "currency": transaction.currency,
                 "country": transaction.country,
                 "device_id": transaction.device_id,
                 "timestamp": transaction.timestamp.isoformat(),

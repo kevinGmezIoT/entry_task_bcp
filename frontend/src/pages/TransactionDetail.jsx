@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ShieldCheck, FileText, Globe, MessageSquare, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, FileText, Globe, MessageSquare, AlertTriangle, Download } from 'lucide-react';
 import api from '../services/api';
 
 const DetailCard = ({ title, icon: Icon, children }) => (
@@ -29,6 +29,8 @@ function TransactionDetail() {
             console.error(err);
             // Data dummy for preview
             setData({
+                transaction_id: id,
+                customer_id: 'C-MOCK-101',
                 decision: 'BLOCK',
                 confidence: 0.94,
                 signals: ['Monto elevado', 'Horario inusual', 'Nueva ubicación'],
@@ -45,6 +47,33 @@ function TransactionDetail() {
         });
     }, [id]);
 
+    const handleDownload = () => {
+        if (!id) return;
+        const url = `${api.defaults.baseURL}/reports/${id}/pdf/`;
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `Reporte_Fraude_${id}.pdf`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const renderFormatted = (text) => {
+        if (!text) return null;
+        return text.split('\n').map((line, i) => (
+            <React.Fragment key={i}>
+                {line.startsWith('#') ? (
+                    <b className="text-gray-900 mt-2 block uppercase text-xs">{line.replace(/^#+\s*/, '')}</b>
+                ) : (
+                    line.split('**').map((part, j) => (
+                        j % 2 === 1 ? <b key={j} className="text-gray-900">{part}</b> : part
+                    ))
+                )}
+                <br />
+            </React.Fragment>
+        ));
+    };
+
     if (loading) return <div>Cargando...</div>;
 
     return (
@@ -58,7 +87,7 @@ function TransactionDetail() {
                 <div>
                     <h2 className="text-3xl font-bold">Detalle de Transacción: {id}</h2>
                     <div className="flex gap-4 mt-2">
-                        <span className={`px-4 py-1 rounded-full text-sm font-bold bg-red-100 text-red-700`}>
+                        <span className={`px-4 py-1 rounded-full text-sm font-bold ${data.decision === 'APPROVE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                             DECISIÓN: {data.decision}
                         </span>
                         <span className="px-4 py-1 rounded-full text-sm font-bold bg-green-100 text-green-700">
@@ -66,7 +95,52 @@ function TransactionDetail() {
                         </span>
                     </div>
                 </div>
+                <button
+                    onClick={handleDownload}
+                    className="btn-primary flex items-center gap-2"
+                >
+                    <Download size={18} />
+                    Descargar Informe PDF
+                </button>
             </div>
+
+            {data.transaction?.customer && (
+                <DetailCard title="Comparativa de Comportamiento" icon={FileText}>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                            <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+                                <tr>
+                                    <th className="px-4 py-2">Métrica</th>
+                                    <th className="px-4 py-2 text-bcp-blue">Transacción Actual</th>
+                                    <th className="px-4 py-2 text-gray-500">Perfil Habitual</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                <tr>
+                                    <td className="px-4 py-3 font-semibold text-gray-600">Monto</td>
+                                    <td className="px-4 py-3 font-bold">{data.transaction.amount} {data.transaction.currency}</td>
+                                    <td className="px-4 py-3 text-gray-500">~{data.transaction.customer.usual_amount_avg} PEN (Promedio)</td>
+                                </tr>
+                                <tr>
+                                    <td className="px-4 py-3 font-semibold text-gray-600">Horario</td>
+                                    <td className="px-4 py-3 font-bold">{new Date(data.transaction.timestamp).getHours()}:00 hrs</td>
+                                    <td className="px-4 py-3 text-gray-500">{data.transaction.customer.usual_hours} hrs</td>
+                                </tr>
+                                <tr>
+                                    <td className="px-4 py-3 font-semibold text-gray-600">País</td>
+                                    <td className="px-4 py-3 font-bold">{data.transaction.country}</td>
+                                    <td className="px-4 py-3 text-gray-500">{data.transaction.customer.usual_countries}</td>
+                                </tr>
+                                <tr>
+                                    <td className="px-4 py-3 font-semibold text-gray-600">Dispositivo</td>
+                                    <td className="px-4 py-3 font-bold truncate max-w-[150px]">{data.transaction.device_id}</td>
+                                    <td className="px-4 py-3 text-gray-500">{data.transaction.customer.usual_devices}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </DetailCard>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <DetailCard title="Señales Detectadas" icon={AlertTriangle}>
@@ -100,11 +174,11 @@ function TransactionDetail() {
                     <div className="space-y-4">
                         <div>
                             <p className="text-xs font-bold uppercase text-gray-400">Para el Cliente:</p>
-                            <p className="text-sm italic">"{data.explanation_customer}"</p>
+                            <p className="text-sm italic">"{renderFormatted(data.explanation_customer)}"</p>
                         </div>
                         <div>
                             <p className="text-xs font-bold uppercase text-gray-400">Para Auditoría:</p>
-                            <p className="text-sm">{data.explanation_audit}</p>
+                            <div className="text-sm">{renderFormatted(data.explanation_audit)}</div>
                         </div>
                     </div>
                 </DetailCard>

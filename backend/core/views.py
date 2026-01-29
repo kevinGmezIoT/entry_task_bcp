@@ -1,9 +1,10 @@
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from core.models import Transaction, CustomerProfile
+from django.http import FileResponse
+from core.models import Transaction, CustomerProfile, DecisionRecord
+from core.report_service import ReportFactory
 from core.services import DecisionService
 from core.serializers import DecisionRecordSerializer, TransactionSerializer
-from django.core.management import call_command
 import logging
 import json
 
@@ -137,11 +138,14 @@ def create_manual_transaction(request):
             }
         )
 
-        # 2. Crear transacción
         from django.utils import timezone
+        from django.utils.dateparse import parse_datetime
         import uuid
         
-        transaction_id = data.get("transaction_id", f"M-{uuid.uuid4().hex[:8]}")
+        timestamp_str = data.get("timestamp")
+        timestamp = parse_datetime(timestamp_str) if timestamp_str else timezone.now()
+        
+        transaction_id = data.get("transaction_id") or f"M-{uuid.uuid4().hex[:8]}"
         transaction = Transaction.objects.create(
             transaction_id=transaction_id,
             customer=customer,
@@ -150,7 +154,7 @@ def create_manual_transaction(request):
             country=data.get("country", "PE"),
             channel=data.get("channel", "MOBILE"),
             device_id=data.get("device_id", "MANUAL-DEV"),
-            timestamp=timezone.now(),
+            timestamp=timestamp,
             merchant_id=data.get("merchant_id", "M-001")
         )
 
@@ -177,3 +181,48 @@ def get_audit_reports(request):
     reports = DecisionRecord.objects.all().order_by('-created_at')[:10]
     serializer = DecisionRecordSerializer(reports, many=True)
     return Response(serializer.data)
+
+@api_view(["GET"])
+def download_report(request, transaction_id):
+    """
+    Generar y descargar el informe de auditoría en el formato solicitado (pdf por defecto).
+    """
+    format = request.GET.get('format', 'pdf').lower()
+    
+    try:
+        transaction = Transaction.objects.get(transaction_id=transaction_id)
+        decision_record = getattr(transaction, 'decision', None)
+        
+        if not decision_record:
+            return Response({"error": "No decision found for this transaction"}, status=404)
+            
+        report_service = ReportFactory.get_service(format)
+        
+        try:
+            report_buffer = report_service.generate(decision_record)
+        except NotImplementedError as e:
+            return Response({"error": str(e)}, status=501)
+            
+        content_types = {
+            'pdf': 'application/pdf',
+            'excel': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'word': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        }
+        
+        extensions = {
+            'pdf': 'pdf',
+            'excel': 'xlsx',
+            'word': 'docx'
+        }
+        
+        return FileResponse(
+            report_buffer, 
+            as_attachment=True, 
+            filename=f"Reporte_Fraude_{transaction_id}.{extensions.get(format, 'pdf')}",
+            content_type=content_types.get(format, 'application/pdf')
+        )
+    except Transaction.DoesNotExist:
+        return Response({"error": "Transaction not found"}, status=404)
+    except Exception as e:
+        logger.exception(f"Error generating {format} report")
+        return Response({"error": str(e)}, status=500)

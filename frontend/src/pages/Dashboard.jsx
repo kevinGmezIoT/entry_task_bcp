@@ -122,7 +122,7 @@ function Dashboard() {
                                 </td>
                                 <td className="px-6 py-4 text-gray-500 text-sm">{tx.timestamp}</td>
                                 <td className="px-6 py-4 text-right">
-                                    <Link to={`/transaction/${tx.id}`} className="text-bcp-blue hover:text-bcp-orange transition-colors">
+                                    <Link to={`/transaction/${tx.transaction_id || tx.id}`} className="text-bcp-blue hover:text-bcp-orange transition-colors">
                                         <ArrowRight size={20} />
                                     </Link>
                                 </td>

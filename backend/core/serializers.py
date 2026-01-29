@@ -7,18 +7,23 @@ class CustomerProfileSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class TransactionSerializer(serializers.ModelSerializer):
+    customer = CustomerProfileSerializer(read_only=True)
     class Meta:
         model = Transaction
         fields = '__all__'
 
 class DecisionRecordSerializer(serializers.ModelSerializer):
+    transaction = TransactionSerializer(read_only=True)
     transaction_id = serializers.ReadOnlyField(source='transaction.transaction_id')
+    customer_id = serializers.ReadOnlyField(source='transaction.customer.customer_id')
     
     class Meta:
         model = DecisionRecord
         fields = [
             'id',
+            'transaction',
             'transaction_id',
+            'customer_id',
             'decision', 
             'confidence', 
             'signals', 

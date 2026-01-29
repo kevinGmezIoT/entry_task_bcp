@@ -11,6 +11,7 @@ from web_search_service import web_search_service
 class AgentState(TypedDict):
     transaction: Dict[str, Any]
     customer: Dict[str, Any]
+    transaction_id: str
     signals: List[str]
     internal_evidence: List[Dict[str, Any]]
     external_evidence: List[Dict[str, Any]]
@@ -54,7 +55,9 @@ def transaction_context_agent(state: AgentState):
         except:
             pass
             
-    if tx.get("country") != cust.get("usual_countries"):
+    # Country analysis
+    usual_countries = [c.strip() for c in cust.get("usual_countries", "").split(',')] if cust.get("usual_countries") else []
+    if tx.get("country") and usual_countries and tx.get("country") not in usual_countries:
         signals.append("País inusual")
     
     print(f" -> Detected signals: {signals}")
@@ -68,7 +71,8 @@ def behavioral_pattern_agent(state: AgentState):
     
     print("[Agent] Behavioral Pattern: Checking history...")
     
-    if tx.get("device_id") != cust.get("usual_devices"):
+    usual_devices = [d.strip() for d in cust.get("usual_devices", "").split(',')] if cust.get("usual_devices") else []
+    if tx.get("device_id") and usual_devices and tx.get("device_id") not in usual_devices:
         current_signals.append("Dispositivo desconocido")
         
     print(f" -> Updated signals: {current_signals}")
@@ -111,13 +115,14 @@ def external_threat_intel_agent(state: AgentState):
 
 def evidence_aggregation_agent(state: AgentState):
     """Reúne todas las evidencias y genera un resumen consolidado."""
+    tx = state["transaction"]
     signals = ", ".join(state["signals"]) if state["signals"] else "Ninguna señal detectada"
     print(f"[Agent] Evidence Aggregation: Consolidating {len(state['signals'])} signals and evidence...")
     
     # Format internal evidence (RAG)
     internal_docs = []
     for doc in state.get("internal_evidence", []):
-        internal_docs.append(f"- [Policy {doc.get('policy_id')}] (v{doc.get('version')}): {doc.get('text')}")
+        internal_docs.append(f"- [Policy {doc.get('policy_id')}] (v{doc.get('version')}): {doc.get('rule')}")
     internal_str = "\n".join(internal_docs) if internal_docs else "No se encontraron políticas internas aplicables."
     
     # Format external evidence (Web Search)
@@ -135,13 +140,15 @@ def evidence_aggregation_agent(state: AgentState):
     EVIDENCIA INTERNA (RAG):
     {internal_str}
     
-    EVIDENCIA EXTERNA (Web Intel):
-    {external_str}
-    
     CONTEXTO DE TRANSACCIÓN:
     {state['transaction']}
     
+    PERFIL HABITUAL DEL CLIENTE:
+    {state['customer']}
+    
     Resume los hallazgos clave de manera objetiva, resaltando conflictos entre la conducta del cliente y las políticas o alertas externas.
+    TEN EN CUENTA LA MONEDA: Asegúrate de mencionar la moneda correcta ({tx.get('currency', 'PEN')}) al referirte a montos. NO asumas que es USD si la transacción indica otra moneda.
+    IMPORTANTE: Usa Markdown estándar para el formato (**negrita**, # encabezados). NO uses etiquetas HTML.
     """
     
     response = llm.invoke(prompt)
@@ -210,7 +217,7 @@ def decision_arbiter_agent(state: AgentState):
     confidence = result.confidence
     
     # HITL Logic: Scalate if confidence is low
-    if confidence < 0.8:
+    if confidence < 0.6:
         print(f" -> Confidence too low ({confidence}). Escalating to human.")
         final_decision = "ESCALATE_TO_HUMAN"
     
@@ -235,6 +242,12 @@ def explainability_agent(state: AgentState):
     Explica de forma clara y amable por qué su transacción (Estado: {decision}) fue procesada de esta manera.
     Usa un lenguaje no técnico. 
     Evita dar detalles técnicos de seguridad que puedan ayudar a un defraudador.
+    
+    TEN EN CUENTA LA MONEDA: Si el cliente pagó en {state['transaction'].get('currency', 'PEN')}, asegúrate de que la explicación no lo confunda con otra moneda.
+
+    REGLA DE FORMATO:
+    - Usa Markdown estándar: **negrita** para resaltar y saltos de línea normales.
+    - NO uses etiquetas HTML como <b> o <br/>.
     """
     
     # Reconstructing the agent path for audit
@@ -242,14 +255,20 @@ def explainability_agent(state: AgentState):
     
     audit_prompt = f"""
     Actúa como un Auditor de Seguridad de IA.
-    Genera un reporte técnico detallado.
+    Genera un reporte técnico detallado para ser incluido en un PDF de auditoría.
+    
     Decisión Final: {decision}
     Ruta de Agentes: {agent_path}
     Evidencia Consolidada: {state['aggregation']}
     Razonamiento del Árbitro: {reasoning}
     Señales: {signals}
     
-    El reporte debe ser profesional y estructurado.
+    TEN EN CUENTA LA MONEDA: Asegúrate de usar la moneda correcta ({state['transaction'].get('currency', 'PEN')}) al referirte a montos en el reporte.
+    
+    REGLA DE FORMATO:
+    - Usa Markdown estándar (**negrita**, # encabezados) para estructurar el reporte.
+    - NO uses etiquetas HTML como <b> o <br/>.
+    - NO generes tablas en texto, describe los datos en formato de lista o párrafo.
     """
     
     exp_cust = llm.invoke(customer_prompt).content
