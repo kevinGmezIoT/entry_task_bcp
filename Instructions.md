@@ -123,6 +123,7 @@ A continuación tienes una **secuencia de procedimientos (en orden)** para const
 * **VPC + NAT Gateway** + **AWS Network Firewall** (controles de egreso) para “gobernanza”.
 * **DynamoDB** (cache de respuestas) + **CloudWatch Logs** (trazabilidad).
 
+* (Se modificó para solo usar Tavily)
 ---
 
 ## 7) Agregación de evidencias, debate y decisión final (con confianza)
@@ -144,7 +145,7 @@ A continuación tienes una **secuencia de procedimientos (en orden)** para const
 
 **Herramientas**
 
-* Amazon Bedrock (LLM) para debate/explicaciones, o LLM self-hosted en ECS (si lo prefieres, pero Bedrock simplifica).
+* Amazon Bedrock (LLM) para debate/explicaciones.
 * Persistencia de `DecisionRecord` + `AuditEvent` (Django).
 
 ---
