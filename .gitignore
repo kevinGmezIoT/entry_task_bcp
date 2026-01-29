@@ -20,4 +20,8 @@ __pycache__/
 .idea/
 .vscode/
 
+# React
+node_modules/
+dist/
+
 challenge.md
