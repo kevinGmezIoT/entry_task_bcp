@@ -133,6 +133,10 @@ class PipelineStack(Stack):
                             'echo Running Migrations and RAG Ingestion...',
                             'CLUSTER_NAME=$(aws cloudformation describe-stacks --stack-name EntryTaskBcpResources$ENVIRONMENT --query "Stacks[0].Outputs[?ExportName==\'EntryClusterName-$ENVIRONMENT\'].OutputValue" --output text)',
                             'SERVICE_NAME=$(aws ecs list-services --cluster $CLUSTER_NAME --query "serviceArns[?contains(@, \'BackendService\')]" --output text | cut -d "/" -f 3)',
+                            
+                            'echo "Forcing ECS redeploy to pull latest images..."',
+                            'aws ecs update-service --cluster $CLUSTER_NAME --service $SERVICE_NAME --force-new-deployment',
+                            
                             'TASK_DEFINITION=$(aws ecs describe-services --cluster $CLUSTER_NAME --services $SERVICE_NAME --query "services[0].taskDefinition" --output text)',
                             'VPC_ID=$(aws cloudformation describe-stacks --stack-name EntryTaskBcpResources$ENVIRONMENT --query "Stacks[0].Outputs[?ExportName==\'EntryVpcId-$ENVIRONMENT\'].OutputValue" --output text)',
                             'SUBNETS=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC_ID" "Name=tag:Name,Values=*Public*" --query "Subnets[*].SubnetId" --output text | sed "s/\\t/,/g")',
