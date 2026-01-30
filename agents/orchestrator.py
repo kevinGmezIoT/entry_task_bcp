@@ -24,15 +24,8 @@ class AgentState(TypedDict):
     explanation_audit: str
 
 # --- LLM Setup ---
-# Sonnet for complex reasoning (Debate, Arbiter)
-sonnet_llm = ChatBedrock(
-    model_id="us.anthropic.claude-3-5-sonnet-20240620-v1:0",
-    model_kwargs={"temperature": 0}
-)
-
-# Haiku for faster processing (Aggregation, Explainability)
-haiku_llm = ChatBedrock(
-    model_id="us.anthropic.claude-3-haiku-20240307-v1:0",
+llm = ChatBedrock(
+    model_id="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
     model_kwargs={"temperature": 0}
 )
 
@@ -159,8 +152,7 @@ def evidence_aggregation_agent(state: AgentState):
     IMPORTANTE: Usa Markdown estándar para el formato (**negrita**, # encabezados). NO uses etiquetas HTML.
     """
     
-    # Use Haiku for faster aggregation
-    response = haiku_llm.invoke(prompt)
+    response = llm.invoke(prompt)
     print(f" -> Summary generated ({len(response.content)} chars)")
     return {"aggregation": response.content}
 
@@ -185,8 +177,8 @@ def debate_agents(state: AgentState):
     
     with concurrent.futures.ThreadPoolExecutor() as executor:
         # Use Sonnet for critical thinking
-        future_fraud = executor.submit(sonnet_llm.invoke, pro_fraud_prompt)
-        future_customer = executor.submit(sonnet_llm.invoke, pro_customer_prompt)
+        future_fraud = executor.submit(llm.invoke, pro_fraud_prompt)
+        future_customer = executor.submit(llm.invoke, pro_customer_prompt)
         
         pro_fraud = future_fraud.result().content
         pro_customer = future_customer.result().content
@@ -226,7 +218,7 @@ def decision_arbiter_agent(state: AgentState):
     """
     
     # Use Sonnet for the final decision
-    structured_llm = sonnet_llm.with_structured_output(DecisionResponse)
+    structured_llm = llm.with_structured_output(DecisionResponse)
     result = structured_llm.invoke(prompt)
     
     final_decision = result.decision
@@ -289,8 +281,8 @@ def explainability_agent(state: AgentState):
     
     with concurrent.futures.ThreadPoolExecutor() as executor:
         # Use Haiku for faster reports
-        future_cust = executor.submit(haiku_llm.invoke, customer_prompt)
-        future_audit = executor.submit(haiku_llm.invoke, audit_prompt)
+        future_cust = executor.submit(llm.invoke, customer_prompt)
+        future_audit = executor.submit(llm.invoke, audit_prompt)
         
         exp_cust = future_cust.result().content
         exp_audit = future_audit.result().content
