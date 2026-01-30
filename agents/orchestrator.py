@@ -23,7 +23,7 @@ class AgentState(TypedDict):
     explanation_customer: str
     explanation_audit: str
 
-# --- LLM Setup ---
+# --- LLM Setup ----
 llm = ChatBedrock(
     model_id="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
     model_kwargs={"temperature": 0}
