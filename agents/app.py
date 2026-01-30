@@ -84,6 +84,9 @@ def orchestrate():
             "explanation_audit": result["explanation_audit"]
         }
         
+        # Log the full JSON output as requested for CloudWatch visibility
+        logger.info(f"[{trace_id}] === RESPONSE JSON ===\n{json.dumps(response, indent=2, ensure_ascii=False)}")
+        
         return jsonify(response)
         
     except Exception as e:

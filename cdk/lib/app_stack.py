@@ -220,4 +220,5 @@ class AppStack(Stack):
 
         CfnOutput(self, "BackendURL", value=f"http://{backend_service.load_balancer.load_balancer_dns_name}")
         CfnOutput(self, "FrontendURL", value=f"https://{distribution.distribution_domain_name}")
+        CfnOutput(self, "FrontendDistributionId", value=distribution.distribution_id)
         CfnOutput(self, "PolicyBucketName", value=policy_bucket.bucket_name)

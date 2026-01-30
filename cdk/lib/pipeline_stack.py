@@ -112,7 +112,8 @@ class PipelineStack(Stack):
                             
                             'echo Building Frontend...',
                             'BACKEND_URL=$(aws cloudformation describe-stacks --stack-name EntryTaskBcp$ENVIRONMENT --query "Stacks[0].Outputs[?OutputKey==\'BackendURL\'].OutputValue" --output text)',
-                            'cd frontend && npm install && VITE_API_URL=${BACKEND_URL}/api npm run build && cd ..'
+                            'echo "Detected Backend URL: $BACKEND_URL"',
+                            'cd frontend && npm install && export VITE_API_URL=${BACKEND_URL}/api && npm run build && cd ..'
                         ]
                     },
                     'post_build': {
@@ -127,6 +128,10 @@ class PipelineStack(Stack):
                             'echo Deploying CDK stacks...',
                             'cdk deploy --all --app "python cdk/main.py" --require-approval never -c environment=' + self.__environment,
                             
+                            'echo Invalidate CloudFront cache...',
+                            'DISTRIBUTION_ID=$(aws cloudformation describe-stacks --stack-name EntryTaskBcp$ENVIRONMENT --query "Stacks[0].Outputs[?OutputKey==\'FrontendDistributionId\'].OutputValue" --output text)',
+                            'if [ "$DISTRIBUTION_ID" != "None" ]; then aws cloudfront create-invalidation --distribution-id $DISTRIBUTION_ID --paths "/*"; fi',
+
                             'echo Running Migrations and RAG Ingestion...',
                             'CLUSTER_NAME=$(aws cloudformation describe-stacks --stack-name EntryTaskBcpResources$ENVIRONMENT --query "Stacks[0].Outputs[?ExportName==\'EntryClusterName-$ENVIRONMENT\'].OutputValue" --output text)',
                             'SERVICE_NAME=$(aws ecs list-services --cluster $CLUSTER_NAME --query "serviceArns[?contains(@, \'BackendService\')]" --output text | cut -d "/" -f 3)',

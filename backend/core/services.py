@@ -73,6 +73,8 @@ class DecisionService:
             response = requests.post(orchestrator_url, json=payload, timeout=180)
             response.raise_for_status()
             agent_result = response.json()
+            # Log the received JSON result from agents-flask
+            logger.info(f"Received result from orchestrator for TX {transaction.transaction_id}:\n{json.dumps(agent_result, indent=2, ensure_ascii=False)}")
         except Exception as e:
             logger.exception(f"Error calling multi-agent orchestrator: {str(e)}")
             # Fallback to local deterministic logic if agents-flask is down
