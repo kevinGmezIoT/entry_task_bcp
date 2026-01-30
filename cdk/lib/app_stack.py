@@ -93,6 +93,8 @@ class AppStack(Stack):
             "DJANGO_DEBUG": ssm.StringParameter.value_for_string_parameter(self, f"/entry-task/{environment}/django-debug"),
             "DATABASE_URL": ssm.StringParameter.value_for_string_parameter(self, f"/entry-task/{environment}/database-url"),
             "S3_POLICY_BUCKET": policy_bucket.bucket_name,
+            "BEDROCK_KB_ID": ssm.StringParameter.value_for_string_parameter(self, f"/entry-task/{environment}/bedrock-kb-id"),
+            "BEDROCK_DS_ID": ssm.StringParameter.value_for_string_parameter(self, f"/entry-task/{environment}/bedrock-ds-id"),
             "AWS_REGION": Stack.of(self).region,
             "AGENTS_SERVICE_URL": "http://agents.local:5001",
         }
