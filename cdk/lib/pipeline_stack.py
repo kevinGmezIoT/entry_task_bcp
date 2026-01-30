@@ -143,7 +143,19 @@ class PipelineStack(Stack):
         
         # Grant permissions
         project.add_to_role_policy(iam.PolicyStatement(
-            actions=["ecr:*", "s3:*", "ssm:*", "secretsmanager:*", "ecs:*", "elasticloadbalancing:*", "iam:*", "cloudfront:*"],
+            actions=[
+                "ecr:*", 
+                "s3:*", 
+                "ssm:*", 
+                "secretsmanager:*", 
+                "ecs:*", 
+                "elasticloadbalancing:*", 
+                "iam:*", 
+                "cloudfront:*",
+                "ec2:*", 
+                "sts:AssumeRole",
+                "cloudformation:*"
+            ],
             resources=["*"]
         ))
         
