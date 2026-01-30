@@ -1,5 +1,6 @@
 import requests
 import logging
+import json
 from datetime import datetime
 from django.conf import settings
 from core.models import CustomerProfile, Transaction, DecisionRecord, AuditEvent, HumanReviewCase
