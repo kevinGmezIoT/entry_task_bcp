@@ -19,8 +19,20 @@ graph TD
 ```
 
 ### 🧠 ¿Por qué Django + Flask?
-- **Django (Backend API)**: Se eligió como el núcleo de la aplicación por su robusto ORM, sistema de autenticación integrado y capacidad para gestionar flujos de trabajo complejos como el **Human-in-the-Loop (HITL)**. Su estructura permite un manejo profesional de la base de datos y la lógica de auditoría.
+- **Django (Backend API)**: Se eligió como el núcleo de la aplicación por su robusto ORM (Object-Relational Mapper), sistema de autenticación integrado y capacidad para gestionar flujos de trabajo complejos como el **Human-in-the-Loop (HITL)**. Su estructura permite un manejo profesional de la base de datos y la lógica de auditoría.
 - **Flask (Agents Service)**: Actúa como un microservicio ligero y de baja latencia especializado en la orquestación de IA. Al usar Flask para los agentes, aislamos la ejecución de **LangGraph** y las llamadas a LLMs, evitando que procesos largos de inferencia bloqueen la API transaccional de Django.
+
+---
+
+## 🔬 RAG vs. Comparaciones Lógicas: El "Por Qué"
+
+Una de las decisiones arquitectónicas clave es el uso de **RAG (Retrieval-Augmented Generation)** para procesar las políticas de fraude, en lugar de depender únicamente de motores de reglas (`if/else`) tradicionales.
+
+### Ventajas del enfoque RAG:
+1.  **Flexibilidad Lingüística**: Las políticas de cumplimiento y riesgos suelen escribirse en lenguaje natural (ej: *"Bloquear transacciones sospechosas en perfiles de alto riesgo durante la madrugada"*). RAG permite que el sistema entienda estas reglas sin necesidad de traducirlas manualmente a código rígido.
+2.  **Mantenimiento Ágil**: Actualizar una política es tan sencillo como subir un nuevo documento `.json` o `.pdf` a S3. No requiere cambios en el código fuente, despliegues de backend, ni migraciones de base de datos.
+3.  **Búsqueda Semántica vs. Exacta**: A diferencia de una comparación lógica que falla si un valor no es exacto, RAG utiliza **embeddings** para encontrar políticas relacionadas por concepto. Si una transacción presenta un patrón "atípico pero no idéntico" a una regla, el sistema puede recuperar el contexto relevante.
+4.  **Citas y Transparencia**: RAG permite que el agente genere una respuesta con **citaciones directas** al texto original de la política. Esto es fundamental para que el auditor humano entienda *exactamente qué línea del reglamento* motivó la decisión de la IA.
 
 ---
 

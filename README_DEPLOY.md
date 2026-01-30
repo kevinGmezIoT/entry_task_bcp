@@ -1,140 +1,155 @@
-# Guía de Despliegue en AWS - Entry Task BCP
+# 🚀 Guía de Despliegue y Configuración Local - BCP Fraud Detection
 
-Este proyecto utiliza **AWS CDK** para la Infraestructura como Código (IaC) y **AWS CodePipeline** para CI/CD.
-
-## Arquitectura de Despliegue
-
-- **Frontend**: React (Vite) alojado en **S3** y distribuido mediante **CloudFront**.
-- **Backend (Django)**: Escala en **ECS Fargate** con un **Application Load Balancer**.
-- **Agentes (Flask)**: Escala en **ECS Fargate** (microservicio separado).
-- **Secretos**: Integración con **AWS Secrets Manager** y **AWS Systems Manager Parameter Store**.
-- **CI/CD**: Tubería automatizada que construye imágenes Docker y despliega todo al realizar push a `master`.
+Esta guía proporciona instrucciones detalladas para configurar el entorno de desarrollo local y desplegar la infraestructura en AWS. Está diseñada para que un nuevo desarrollador pueda poner en marcha el proyecto desde cero.
 
 ---
 
-## 1. Requisitos Previos
+## 📋 Requisitos Previos
 
-1.  **AWS CLI** configurado con credenciales.
-2.  **Node.js** y **Python 3.12** instalados.
-3.  **GitHub Token**: Crear un Personal Access Token con permisos `repo` y `admin:repo_hook`. guardarlo en **AWS Secrets Manager** con el nombre `GITHUB-TOKEN` (formato texto plano).
+Antes de comenzar, asegúrate de tener instalado:
 
----
-
-## 2. Configuración de Secretos y Parámetros
-
-Antes del primer despliegue, debes configurar los siguientes valores en AWS:
-
-### Secrets Manager (Nombre del secreto exacto)
-- `GITHUB-TOKEN`: Tu token de GitHub.
-- `TAVILY_API_KEY`: API Key para búsqueda web.
-- `LANGCHAIN_API_KEY`: API Key para LangSmith/LangChain.
-- `DJANGO_SECRET_KEY`: La clave secreta de tu aplicación Django.
-
-### Parameter Store (Ejemplo para entorno DEV)
-- `/entry-task/DEV/django-debug`: `1` o `0`.
-- `/entry-task/DEV/database-url`: URL de conexión a PostgreSQL (ej. `postgresql://user:pass@host:5432/db`).
-- `/entry-task/DEV/bedrock-kb-id`: ID de tu Knowledge Base de Bedrock.
-- `/entry-task/DEV/bedrock-ds-id`: ID de tu Data Source de Bedrock.
-
-
+1.  **Python 3.12+** y [uv](https://docs.astral.sh/uv/) (recomendado para gestión de dependencias).
+2.  **Node.js 20+** y `npm`.
+3.  **Docker Desktop** (para probar contenedores localmente).
+4.  **AWS CLI** configurado con credenciales válidas.
+5.  **AWS CDK CLI** (`npm install -g aws-cdk`).
 
 ---
 
-## 3. Comandos para Probar Docker Localmente
+## 💻 1. Configuración Local (Paso a Paso)
 
-Para validar los Dockerfiles antes de desplegar:
+### A. Clonar y Variables de Entorno
+1.  Clona el repositorio.
+2.  Crea un archivo `.env` en la raíz del proyecto basado en el siguiente ejemplo:
 
-### Backend
+```env
+# Django
+DJANGO_SECRET_KEY=tu_clave_secreta
+DJANGO_DEBUG=1
+DATABASE_URL=sqlite:///db.sqlite3
+
+# AWS (para RAG y Bedrock)
+AWS_REGION=us-east-2
+BEDROCK_KB_ID=tu_kb_id
+BEDROCK_DS_ID=tu_ds_id
+
+# Agentes e Inteligencia Externa
+TAVILY_API_KEY=tu_tavily_key
+LANGCHAIN_API_KEY=tu_langchain_key
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_PROJECT=bcp-fraud-detection
+```
+
+### B. Backend (Django)
+1.  Navega a `backend/`.
+2.  Instala dependencias y activa el entorno:
+    ```bash
+    uv venv
+    # En Windows: .venv\Scripts\activate
+    uv sync
+    ```
+3.  Aplica migraciones y carga datos iniciales:
+    ```bash
+    python manage.py migrate
+    python manage.py seed_data
+    ```
+4.  Inicia el servidor:
+    ```bash
+    python manage.py runserver
+    ```
+
+### C. Sistema de Agentes (Flask)
+1.  Navega a `agents/`.
+2.  Instala dependencias:
+    ```bash
+    uv venv
+    uv sync
+    ```
+3.  Inicia el servicio de orquestación:
+    ```bash
+    python app.py
+    ```
+    *Nota: Los agentes correrán por defecto en http://localhost:5001.*
+
+### D. Frontend (React + Vite)
+1.  Navega a `frontend/`.
+2.  Instala dependencias:
+    ```bash
+    npm install
+    ```
+3.  Inicia el modo desarrollo:
+    ```bash
+    npm run dev
+    ```
+
+---
+
+## 🐳 2. Pruebas con Docker
+
+Para validar que los servicios están listos para la nube, puedes usar Docker localmente:
+
 ```bash
+# Backend
 cd backend
-docker build -t bcp-fraud-backend .
-# Ejecutar localmente (requiere configurar ENV o archivo .env)
-docker run -p 8000:8000 --env-file ../.env bcp-fraud-backend
+docker build -t bcp-backend .
+docker run -p 8000:8000 --env-file ../.env bcp-backend
+
+# Agentes
+cd agents
+docker build -t bcp-agents .
+docker run -p 5001:5001 --env-file ../.env bcp-agents
 ```
 
-### Agentes
+---
+
+## ☁️ 3. Despliegue en AWS (CDK)
+
+El despliegue está automatizado con AWS CDK y CodePipeline.
+
+### Configuración de Secretos (Obligatorio)
+Antes de desplegar, guarda los siguientes secretos en **AWS Secrets Manager** (nombre exacto):
+*   `GITHUB-TOKEN`: Token de acceso personal con permisos de repo.
+*   `TAVILY_API_KEY`: Tu API Key de Tavily.
+*   `LANGCHAIN_API_KEY`: Tu API Key de LangSmith.
+
+### Despliegue del Pipeline
+Desde la raíz del proyecto:
 ```bash
-cd agents
-docker build -t bcp-fraud-agents .
-# Ejecutar localmente pasando credenciales de AWS
-docker run -p 5001:5001 --env-file ../.env -e AWS_ACCESS_KEY_ID=%AWS_ACCESS_KEY_ID% -e AWS_SECRET_ACCESS_KEY=%AWS_SECRET_ACCESS_KEY% -e AWS_SESSION_TOKEN=%AWS_SESSION_TOKEN% bcp-fraud-agents
+cd cdk
+uv venv
+uv sync
+cdk deploy --all -c environment=DEV
 ```
+
+Esto creará:
+- **S3 + CloudFront**: Para el frontend estático.
+- **ECS Fargate**: Para el Backend y los Agentes.
+- **Application Load Balancer (ALB)**: Como punto de entrada.
+- **CodePipeline**: Para CI/CD automático en cada `push` a `master`.
+
+---
+
+## 🔍 4. Verificación y Troubleshooting
+
+### Health Checks
+- **Frontend**: Accede a la URL de CloudFront (disponible en los outputs de CDK).
+- **Backend API**: `GET /api/health/`
+- **Agents**: `GET /health`
+
+### Tareas Post-Despliegue
+Si necesitas sincronizar el Knowledge Base de Bedrock o reinicializar datos en ECS:
+```bash
+# Ejemplo: Ejecutar seeding en el contenedor de ECS
+aws ecs execute-command --cluster EntryClusterBcp-DEV \
+    --task <TASK_ID> --container BackendContainer \
+    --interactive --command "python manage.py seed_data"
+```
+
+### Logs
+- **Local**: Revisa la terminal de cada servicio.
+- **AWS**: Busca en **CloudWatch Logs** bajo el grupo `/aws/ecs/EntryTaskBcp`.
+
+---
 
 > [!TIP]
-> Si estás en Linux/Mac, usa `$AWS_ACCESS_KEY_ID` en lugar de `%AWS_ACCESS_KEY_ID%`.
-
-
----
-
-## 5. Despliegue Inicial de la Infraestructura
-
-Ejecuta estos comandos desde la raíz del proyecto para levantar la tubería CI/CD:
-
-```bash
-# Instalar dependencias del CDK (si no lo has hecho)
-cd cdk
-pip install -r requirements.txt
-npm install -g aws-cdk
-
-# Desplegar la tubería (Pipeline) usando un perfil específico de AWS
-cdk deploy --all -c environment=DEV --profile TU_PERFIL_AWS
-```
-
-> [!NOTE]
-> Si no especificas `--profile`, CDK usará el perfil `default` configurado en tus credenciales locales. Alternativamente, puedes usar la variable de entorno `export AWS_PROFILE=TU_PERFIL`.
-
-
-Una vez que el Pipeline esté creado, cualquier push a la rama `master` de tu repositorio disparará automáticamente:
-1.  Construcción de imágenes Docker (Backend y Agentes).
-2.  Push a **Amazon ECR**.
-3.  Build de React Frontend.
-4.  Sincronización a **S3**.
-5.  Actualización de servicios en **ECS Fargate**.
-
----
-
-## 6. Verificación y Operaciones Post-Despliegue
-
-Una vez que el Pipeline termine (puedes monitorearlo en la consola de **AWS CodePipeline**), ejecuta estos pasos para validar todo:
-
-### A. Verificar Salud de los Servicios
-Obtén las URLs de los outputs de CloudFormation o de la pestaña "Outputs" del stack `App` en CDK.
-
-- **Frontend**: Abre la URL de CloudFront en tu navegador.
-- **Backend Health**: `curl https://<TU_URL_ALB>/api/health/`
-- **Agents Health**: `curl https://<TU_URL_ALB>:5001/health` (si el puerto está expuesto) o verifica en ECS CloudWatch Logs.
-
-### B. Sincronización Manual de RAG (Políticas)
-Si modificas `data/fraud_policies.json` y quieres actualizar el RAG en la nube sin esperar al pipeline (o como primer paso):
-
-```bash
-# Entrar al contenedor del Backend en ECS (usando AWS CLI)
-# Primero obtén el ID del cluster y la tarea
-aws ecs list-tasks --cluster EntryClusterBcp-DEV
-
-# Ejecutar los comandos de Django
-aws ecs execute-command --cluster EntryClusterBcp-DEV \
-    --task <TASK_ID> \
-    --container BackendContainer \
-    --interactive \
-    --command "python manage.py seed_data"
-
-aws ecs execute-command --cluster EntryClusterBcp-DEV \
-    --task <TASK_ID> \
-    --container BackendContainer \
-    --interactive \
-    --command "python manage.py ingest_rag"
-```
-
-> [!IMPORTANT]
-> Para usar `execute-command`, debes tener instalada la extensión `session-manager-plugin` de AWS CLI en tu máquina local.
-
-### C. Verificar Logs
-Si algo falla, la fuente de verdad son los logs:
-- **CloudWatch Logs**: Busca los grupos `/aws/ecs/EntryTaskBcp...` para ver la salida de Django y Flask.
-
-### D. Probar Flujo Completo
-Usa el script de prueba local ajustando la URL:
-```bash
-python verify_step_8.py --url https://<TU_URL_ALB>
-```
+> Si encuentras errores de permisos con Bedrock localmente, asegúrate de que tu perfil de AWS tenga la política `AmazonBedrockFullAccess` o similar.

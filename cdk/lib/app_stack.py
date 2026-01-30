@@ -104,6 +104,8 @@ class AppStack(Stack):
         agents_env = {
             "BEDROCK_KB_ID": ssm.StringParameter.value_for_string_parameter(self, f"/entry-task/{environment}/bedrock-kb-id"),
             "BEDROCK_DS_ID": ssm.StringParameter.value_for_string_parameter(self, f"/entry-task/{environment}/bedrock-ds-id"),
+            "LANGCHAIN_PROJECT": ssm.StringParameter.value_for_string_parameter(self, f"/entry-task/{environment}/langchain-project"),
+            "LANGCHAIN_TRACING_V2": "true",
             "AWS_REGION": Stack.of(self).region,
         }
 
