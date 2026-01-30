@@ -14,6 +14,7 @@ from aws_cdk import (
     aws_cloudfront_origins as origins,
     aws_s3 as s3,
     aws_servicediscovery as servicediscovery,
+    aws_elasticloadbalancingv2 as elbv2,
     CfnOutput
 )
 
@@ -131,6 +132,14 @@ class AppStack(Stack):
             ),
             health_check_grace_period=Duration.seconds(60)
         )
+
+        backend_service.target_group.configure_health_check(
+            path="/api/health/",
+            interval=Duration.seconds(30),
+            healthy_threshold_count=2,
+            unhealthy_threshold_count=5
+        )
+
 
         # Agents Service (Separate Service)
         agents_task_def = ecs.FargateTaskDefinition(self, "AgentsTaskDef",

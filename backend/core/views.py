@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 @api_view(["GET"])
 def health(request):
+    logger.info(f"Health check hit. Path: {request.path}")
     return Response({"status": "ok"})
 
 @api_view(["POST"])
