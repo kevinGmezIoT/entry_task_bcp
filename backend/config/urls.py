@@ -3,12 +3,15 @@ from django.urls import path
 from core.views import (
     health, analyze_transaction, get_transaction_detail, 
     list_hitl_cases, resolve_hitl_case, seed_batch, 
-    create_manual_transaction, get_audit_reports, download_report
+    create_manual_transaction, get_audit_reports, download_report,
+    get_dashboard_stats, list_transactions
 )
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/health/", health),
+    path("api/dashboard/stats/", get_dashboard_stats),
+    path("api/transactions/", list_transactions),
     path("api/transactions/analyze/", analyze_transaction),
     path("api/transactions/seed/", seed_batch),
     path("api/transactions/create/", create_manual_transaction),

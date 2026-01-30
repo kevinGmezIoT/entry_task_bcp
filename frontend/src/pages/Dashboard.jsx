@@ -17,31 +17,34 @@ const StatCard = ({ title, value, icon: Icon, color }) => (
 
 function Dashboard() {
     const [transactions, setTransactions] = useState([]);
+    const [stats, setStats] = useState({
+        total_analyzed: 0,
+        blocked: 0,
+        pending_hitl: 0,
+        accuracy: 99.2
+    });
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // In a real app we might have a list endpoint, using analyze/ for demo if needed 
-        // or just fetching what we have from a generic /transactions/ endpoint if implemented
-        api.get('/admin/core/transaction/').then(res => {
-            // Mocking some data if the admin endpoint isn't public API
-            // Since Step 9 might not have a full "list" endpoint, we use dummy data for UI demo
-            setTransactions([
-                { id: 'T-001', amount: 1500.00, decision: 'APPROVE', confidence: 0.98, timestamp: '2026-01-29 10:00' },
-                { id: 'T-002', amount: 5000.00, decision: 'BLOCK', confidence: 0.92, timestamp: '2026-01-29 10:05' },
-                { id: 'T-003', amount: 2500.00, decision: 'ESCALATE_TO_HUMAN', confidence: 0.65, timestamp: '2026-01-29 10:10' },
-                { id: 'T-004', amount: 120.00, decision: 'APPROVE', confidence: 0.99, timestamp: '2026-01-29 10:15' },
-            ]);
-            setLoading(false);
-        }).catch(err => {
-            console.error(err);
-            // Fallback dummy data for demo
-            setTransactions([
-                { id: 'T-001', amount: 1500.00, decision: 'APPROVE', confidence: 0.98, timestamp: '2026-01-29 10:00' },
-                { id: 'T-002', amount: 5000.00, decision: 'BLOCK', confidence: 0.92, timestamp: '2026-01-29 10:05' },
-                { id: 'T-003', amount: 2500.00, decision: 'ESCALATE_TO_HUMAN', confidence: 0.65, timestamp: '2026-01-29 10:10' },
-            ]);
-            setLoading(false);
-        });
+        const fetchData = async () => {
+            try {
+                const [statsRes, txRes] = await Promise.all([
+                    api.get('dashboard/stats/'),
+                    api.get('transactions/')
+                ]);
+                setStats(statsRes.data);
+                setTransactions(txRes.data);
+            } catch (err) {
+                console.error("Error fetching dashboard data:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+        // Polling cada 30 segundos para actualizar el dashboard
+        const interval = setInterval(fetchData, 30000);
+        return () => clearInterval(interval);
     }, []);
 
     const getStatusColor = (decision) => {
@@ -78,10 +81,10 @@ function Dashboard() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <StatCard title="Total Analizadas" value="1,284" icon={TrendingUp} color="bg-blue-100 text-blue-600" />
-                <StatCard title="Bloqueadas" value="42" icon={ShieldAlert} color="bg-red-100 text-red-600" />
-                <StatCard title="Pendiente HITL" value="8" icon={AlertCircle} color="bg-orange-100 text-orange-600" />
-                <StatCard title="Tasa de Precisión" value="99.2%" icon={CheckCircle} color="bg-green-100 text-green-600" />
+                <StatCard title="Total Analizadas" value={stats.total_analyzed.toLocaleString()} icon={TrendingUp} color="bg-blue-100 text-blue-600" />
+                <StatCard title="Bloqueadas" value={stats.blocked.toLocaleString()} icon={ShieldAlert} color="bg-red-100 text-red-600" />
+                <StatCard title="Pendiente HITL" value={stats.pending_hitl.toLocaleString()} icon={AlertCircle} color="bg-orange-100 text-orange-600" />
+                <StatCard title="Tasa de Precisión" value={`${stats.accuracy}%`} icon={CheckCircle} color="bg-green-100 text-green-600" />
             </div>
 
             <div className="glass-card rounded-2xl overflow-hidden">

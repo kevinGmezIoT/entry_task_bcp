@@ -51,7 +51,7 @@ function Reports() {
     if (loading) return (
         <div className="space-y-8">
             <div>
-                <h2 className="text-3xl font-bold text-gray-900">Informes de Auditoría (Step 11)</h2>
+                <h2 className="text-3xl font-bold text-gray-900">Informes de Auditoría</h2>
                 <p className="text-gray-500">Evidencias consolidadas y explicaciones generadas por la IA para fines de reporte.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -89,7 +89,7 @@ function Reports() {
     return (
         <div className="space-y-8">
             <div>
-                <h2 className="text-3xl font-bold text-gray-900">Informes de Auditoría (Step 11)</h2>
+                <h2 className="text-3xl font-bold text-gray-900">Informes de Auditoría</h2>
                 <p className="text-gray-500">Evidencias consolidadas y explicaciones generadas por la IA para fines de reporte.</p>
             </div>
 

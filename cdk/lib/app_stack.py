@@ -186,6 +186,15 @@ class AppStack(Stack):
                 ),
                 viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS
             ),
+            additional_behaviors={
+                "/api/*": cloudfront.BehaviorOptions(
+                    origin=origins.HttpOrigin(backend_service.load_balancer.load_balancer_dns_name, protocol_policy=cloudfront.OriginProtocolPolicy.HTTP_ONLY),
+                    viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+                    allowed_methods=cloudfront.AllowedMethods.ALLOW_ALL,
+                    cache_policy=cloudfront.CachePolicy.CACHING_DISABLED,
+                    origin_request_policy=cloudfront.OriginRequestPolicy.ALL_VIEWER
+                )
+            },
             price_class=cloudfront.PriceClass.PRICE_CLASS_100,
             error_responses=[
                 cloudfront.ErrorResponse(

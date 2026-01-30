@@ -1,10 +1,12 @@
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.http import FileResponse
-from core.models import Transaction, CustomerProfile, DecisionRecord
+from core.models import Transaction, CustomerProfile, DecisionRecord, HumanReviewCase
 from core.report_service import ReportFactory
 from core.services import DecisionService
-from core.serializers import DecisionRecordSerializer, TransactionSerializer
+from core.serializers import DecisionRecordSerializer, TransactionSerializer, HumanReviewCaseSerializer
+from django.db.models import Count, Avg
+from django.utils.timezone import now
 import logging
 import json
 
@@ -226,3 +228,41 @@ def download_report(request, transaction_id):
     except Exception as e:
         logger.exception(f"Error generating {format} report")
         return Response({"error": str(e)}, status=500)
+
+@api_view(["GET"])
+def get_dashboard_stats(request):
+    """
+    Calcula estadísticas para el dashboard.
+    """
+    total_analyzed = DecisionRecord.objects.count()
+    blocked = DecisionRecord.objects.filter(decision='BLOCK').count()
+    pending_hitl = HumanReviewCase.objects.filter(status='OPEN').count()
+    
+    # Calculamos la precisión como el promedio de confianza de todas las transacciones procesadas
+    # Si no hay transacciones, devolvemos 100% como base
+    stats_agg = DecisionRecord.objects.aggregate(avg_confidence=Avg('confidence'))
+    accuracy = round((stats_agg['avg_confidence'] or 1.0) * 100, 1)
+    
+    return Response({
+        "total_analyzed": total_analyzed,
+        "blocked": blocked,
+        "pending_hitl": pending_hitl,
+        "accuracy": accuracy
+    })
+
+@api_view(["GET"])
+def list_transactions(request):
+    """
+    Listar las transacciones más recientes con su decisión.
+    """
+    decisions = DecisionRecord.objects.select_related('transaction').order_by('-created_at')[:20]
+    data = []
+    for d in decisions:
+        data.append({
+            "id": d.transaction.transaction_id,
+            "amount": d.transaction.amount,
+            "decision": d.decision,
+            "confidence": d.confidence,
+            "timestamp": d.created_at.strftime("%Y-%m-%d %H:%M")
+        })
+    return Response(data)
