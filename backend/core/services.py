@@ -70,7 +70,7 @@ class DecisionService:
         
         try:
             logger.info(f"Calling orchestrator for transaction {transaction.transaction_id}")
-            response = requests.post(orchestrator_url, json=payload, timeout=60)
+            response = requests.post(orchestrator_url, json=payload, timeout=300)
             response.raise_for_status()
             agent_result = response.json()
             # Log the received JSON result from agents-flask
