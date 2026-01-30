@@ -122,6 +122,7 @@ class AppStack(Stack):
             task_image_options=ecs_patterns.ApplicationLoadBalancedTaskImageOptions(
                 image=ecs.ContainerImage.from_ecr_repository(backend_repository, "latest"),
                 container_port=8000,
+                container_name="BackendContainer",
                 environment=backend_env,
                 secrets=backend_secrets,
                 log_driver=ecs.LogDrivers.aws_logs(stream_prefix="Backend")
