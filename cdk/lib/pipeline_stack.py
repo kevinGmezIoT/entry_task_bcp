@@ -111,7 +111,8 @@ class PipelineStack(Stack):
                             'docker tag $AGENTS_REPO_NAME:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$AGENTS_REPO_NAME:latest',
                             
                             'echo Building Frontend...',
-                            'cd frontend && npm install && npm run build && cd ..'
+                            'BACKEND_URL=$(aws cloudformation describe-stacks --stack-name EntryTaskBcp$ENVIRONMENT --query "Stacks[0].Outputs[?OutputKey==\'BackendURL\'].OutputValue" --output text)',
+                            'cd frontend && npm install && VITE_API_URL=${BACKEND_URL}/api npm run build && cd ..'
                         ]
                     },
                     'post_build': {
