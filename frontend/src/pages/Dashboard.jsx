@@ -32,6 +32,8 @@ function Dashboard() {
                     api.get('dashboard/stats/'),
                     api.get('transactions/')
                 ]);
+                console.log("Stats API Response:", statsRes.data);
+                console.log("Transactions API Response:", txRes.data);
                 setStats(statsRes.data);
                 setTransactions(txRes.data);
             } catch (err) {
@@ -81,10 +83,10 @@ function Dashboard() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <StatCard title="Total Analizadas" value={stats.total_analyzed.toLocaleString()} icon={TrendingUp} color="bg-blue-100 text-blue-600" />
-                <StatCard title="Bloqueadas" value={stats.blocked.toLocaleString()} icon={ShieldAlert} color="bg-red-100 text-red-600" />
-                <StatCard title="Pendiente HITL" value={stats.pending_hitl.toLocaleString()} icon={AlertCircle} color="bg-orange-100 text-orange-600" />
-                <StatCard title="Tasa de Precisión" value={`${stats.accuracy}%`} icon={CheckCircle} color="bg-green-100 text-green-600" />
+                <StatCard title="Total Analizadas" value={(stats?.total_analyzed ?? 0).toLocaleString()} icon={TrendingUp} color="bg-blue-100 text-blue-600" />
+                <StatCard title="Bloqueadas" value={(stats?.blocked ?? 0).toLocaleString()} icon={ShieldAlert} color="bg-red-100 text-red-600" />
+                <StatCard title="Pendiente HITL" value={(stats?.pending_hitl ?? 0).toLocaleString()} icon={AlertCircle} color="bg-orange-100 text-orange-600" />
+                <StatCard title="Tasa de Precisión" value={`${stats?.accuracy ?? 0}%`} icon={CheckCircle} color="bg-green-100 text-green-600" />
             </div>
 
             <div className="glass-card rounded-2xl overflow-hidden">
@@ -103,10 +105,10 @@ function Dashboard() {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                        {transactions.map((tx) => (
+                        {transactions?.map((tx) => (
                             <tr key={tx.id} className="hover:bg-gray-50/80 transition-colors">
                                 <td className="px-6 py-4 font-medium text-gray-900">{tx.id}</td>
-                                <td className="px-6 py-4">${tx.amount.toLocaleString()}</td>
+                                <td className="px-6 py-4">${(tx.amount ?? 0).toLocaleString()}</td>
                                 <td className="px-6 py-4">
                                     <span className={`px-3 py-1 rounded-full text-xs font-bold ${getStatusColor(tx.decision)}`}>
                                         {tx.decision}
