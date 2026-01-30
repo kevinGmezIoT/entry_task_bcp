@@ -148,5 +148,7 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Multi-agent orchestrator URL
+ORCHESTRATOR_URL = os.getenv('AGENTS_SERVICE_URL', 'http://localhost:5001') + '/orchestrate'
 # CORS configuration
 CORS_ALLOW_ALL_ORIGINS = True

@@ -65,8 +65,8 @@ class DecisionService:
         }
 
         # 2. Call the Flask Orchestrator
-        # Default to localhost if not specified in settings
-        orchestrator_url = getattr(settings, "ORCHESTRATOR_URL", "http://192.168.2.11:5001/orchestrate")
+        # Use the orchestrator URL from settings (which defaults to agents.local in production)
+        orchestrator_url = settings.ORCHESTRATOR_URL
         
         try:
             logger.info(f"Calling orchestrator for transaction {transaction.transaction_id}")
