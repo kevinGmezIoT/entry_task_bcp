@@ -75,12 +75,12 @@ function ManualEntry() {
                         <label className="text-sm font-semibold text-gray-600 flex items-center gap-2">
                             <DollarSign size={14} /> Monto
                         </label>
-                        <div className="flex gap-2">
+                        <div className="flex border border-gray-200 rounded-xl focus-within:ring-2 focus-within:ring-bcp-blue/20 transition-all overflow-hidden bg-white">
                             <select
                                 name="currency"
                                 value={formData.currency}
                                 onChange={handleChange}
-                                className="px-2 py-3 rounded-xl border border-gray-200 outline-none bg-gray-50"
+                                className="px-3 py-3 bg-gray-50 border-r border-gray-200 outline-none text-sm font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors"
                             >
                                 <option value="PEN">PEN</option>
                                 <option value="USD">USD</option>
@@ -91,7 +91,7 @@ function ManualEntry() {
                                 name="amount"
                                 value={formData.amount}
                                 onChange={handleChange}
-                                className="flex-1 px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-bcp-blue/20 outline-none"
+                                className="flex-1 px-4 py-3 outline-none"
                                 required
                             />
                         </div>

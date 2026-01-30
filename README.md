@@ -4,9 +4,9 @@ Sistema inteligente de detección de fraude en tiempo real basado en una arquite
 
 ---
 
-## 🏗️ Arquitectura del Proyecto
+## 🏗️ Arquitectura y Estrategia Tecnológica
 
-El sistema está diseñado como un mono-repositorio robusto con cuatro componentes principales orquestados para alta disponibilidad y escalabilidad.
+El sistema se divide en tres capas principales desacopladas para garantizar escalabilidad, seguridad y agilidad en el desarrollo.
 
 ```mermaid
 graph TD
@@ -14,67 +14,68 @@ graph TD
     B -->|Orquestación| C[Agents Flask]
     C -->|RAG| D[Amazon Bedrock Knowledge Base]
     C -->|Web Search| E[Tavily Search Gateway]
-    B -->|Persistencia| F[RDS PostgreSQL]
+    B -->|Persistencia| F[(SQLite DB)]
     G[CDK IaC] -->|Despliegue| H[AWS Infrastructure]
 ```
 
-### 📦 Componentes Principales
-
-#### 🛡️ [Agents Service](file:///g:/BCP/Desaf%C3%ADo%20t%C3%A9cnico/entry_task_bcp/agents) (Flask + LangGraph)
-El "cerebro" del sistema. Utiliza **LangGraph** para orquestar un flujo de agentes especializados:
-- **Agentes de Contexto y Comportamiento**: Analizan señales de transacciones y perfiles de clientes.
-- **RAG Agent**: Consulta políticas de fraude inyectadas en **Amazon Bedrock**.
-- **Web Intel Agent**: Realiza búsquedas gobernadas mediante **Tavily** para detectar amenazas externas.
-- **Debate & Arbritración**: Un proceso de debate paralelo (Pro-Fraud vs Pro-Customer) para una decisión final balanceada.
-- **Explainability Agents**: Generan reportes en lenguaje natural para el cliente y auditoría técnica.
-
-#### ⚙️ [Backend API](file:///g:/BCP/Desaf%C3%ADo%20t%C3%A9cnico/entry_task_bcp/backend) (Django + DRF)
-Gestiona la lógica de negocio, persistencia y el ciclo de vida del **Human-in-the-Loop (HITL)**:
-- **Gestión de Casos**: Cola de revisión para decisiones con baja confianza.
-- **Auditoría**: Registro inmutable de cada paso del proceso de decisión.
-- **Generación de Reportes**: Servicio automatizado para crear reportes PDF de auditoría.
-
-#### 🖥️ [Frontend Console](file:///g:/BCP/Desaf%C3%ADo%20t%C3%A9cnico/entry_task_bcp/frontend) (React + Vite)
-Interfaz moderna y responsiva para analistas financieros:
-- **Dashboard en Tiempo Real**: Visualización de métricas de precisión y transacciones bloqueadas.
-- **Centro de Control HITL**: Interfaz para que humanos resuelvan casos derivados por la IA.
-- **Explorador de Auditoría**: Visualización detallada de citaciones RAG y evidencia web.
-
-#### 🚀 [Infrastructure/CDK](file:///g:/BCP/Desaf%C3%ADo%20t%C3%A9cnico/entry_task_bcp/cdk) (AWS CDK)
-Define toda la infraestructura como código:
-- **Pipeline CI/CD**: Automatización completa en AWS CodePipeline.
-- **ECS Fargate**: Cómputo serverless para Backend y Agentes.
-- **CloudFront**: Distribución global y segura para el Frontend alojado en S3.
+### 🧠 ¿Por qué Django + Flask?
+- **Django (Backend API)**: Se eligió como el núcleo de la aplicación por su robusto ORM, sistema de autenticación integrado y capacidad para gestionar flujos de trabajo complejos como el **Human-in-the-Loop (HITL)**. Su estructura permite un manejo profesional de la base de datos y la lógica de auditoría.
+- **Flask (Agents Service)**: Actúa como un microservicio ligero y de baja latencia especializado en la orquestación de IA. Al usar Flask para los agentes, aislamos la ejecución de **LangGraph** y las llamadas a LLMs, evitando que procesos largos de inferencia bloqueen la API transaccional de Django.
 
 ---
 
-## 🛠️ Criterios de Ingeniería Aplicados
+## 🛡️ Detalles del Sistema de Agentes
 
-1.  **Orquestación Basada en Grafos**: Uso de LangGraph para manejar flujos cíclicos/acíclicos con estado persistente, permitiendo re-entrar en flujos HITL.
-2.  **Especialización de Modelos**:
-    - `Claude 3.5 Sonnet` para tareas de razonamiento complejo (Debate, Arbitraje).
-    - `Claude 3 Haiku` para procesamiento rápido y generación de lenguaje (Resumen, Explicaciones).
-3.  **Observabilidad Nativa**: Implementación de Trace IDs que viajan desde el Frontend hasta los Agentes, vinculando logs en CloudWatch para una trazabilidad E2E.
-4.  **Seguridad & Gobernanza**:
-    - **Principio de Menor Privilegio**: Roles IAM granulares para cada servicio ECS.
-    - **Web Search Controlado**: Allowlist de dominios y control de salida mediante un Gateway gobernado.
-5.  **Clean Architecture**: Separación estricta de dominios entre el análisis de señales (Business Logic) y la orquestación IA (Intelligence Layer).
+El servicio de agentes utiliza **LangGraph** para definir un grafo de estado donde cada nodo es un agente experto.
 
----
+### 📝 Prompts y Lógica de Decisión
 
-## ✨ Valor Agregado y Mejoras
+Los agentes utilizan prompts especializados según su rol:
 
-Respecto a los requerimientos base, se han implementado las siguientes mejoras:
+| Agente | Lógica / Prompt Clave |
+| :--- | :--- |
+| **Evidence Aggregator** | "Resume los hallazgos clave de manera objetiva, resaltando conflictos entre la conducta del cliente y las políticas o alertas externas." |
+| **Debate (Pro-Fraud)** | "Actúa como un Investigador Forense. Argumenta de forma agresiva por qué esta transacción DEBERÍA ser bloqueada." |
+| **Debate (Pro-Customer)** | "Actúa como un Defensor de la Experiencia del Cliente. Argumenta por qué esta transacción podría ser LEGÍTIMA." |
+| **Decision Arbiter** | "Balancea el riesgo financiero con la experiencia del cliente. Si la confianza es < 0.6, escala a humano (HITL)." |
+| **Explainability** | Genera reportes diferenciados: uno empático para el cliente y uno técnico cargado de evidencias para el auditor. |
 
-- **Debate Adversarial**: Los agentes no solo analizan, sino que debaten. Esto reduce sesgos y mejora la precisión en un 15% según pruebas internas.
-- **Reportes de Auditoría Automatizados**: Generación dinámica de PDFs con citas directas a políticas internas y URLs externas para soporte legal.
-- **Cálculo de Precisión Inteligente**: El dashboard calcula la tasa de acierto basada en la confianza histórica y la retroalimentación humana (HITL).
-- **Ejecución de Agentes en Paralelo**: Reducción drástica del tiempo de respuesta mediante el procesamiento concurrente de RAG y Búsqueda Web.
-- **Manejo Multi-Moneda**: Soporte inteligente para transacciones en PEN y USD, evitando confusiones en el análisis de montos inusuales.
+### ⚡ Patrones de Diseño
+- **State Graph (LangGraph)**: Orquestación cíclica y paralela.
+- **Parallel Execution**: Los agentes de RAG y Búsqueda Web se ejecutan en paralelo para reducir el tiempo de respuesta (latency).
+- **Specialized LLM Roles**: Uso de `Claude 3.5 Sonnet` para razonamiento crítico y `Claude 3 Haiku` para tareas de extracción y resumen.
 
 ---
 
-## 📖 Guías Rápidas
+## 📊 Persistencia y Audit Trail
 
-- [Documentación de Despliegue](file:///g:/BCP/Desaf%C3%ADo%20t%C3%A9cnico/entry_task_bcp/README_DEPLOY.md)
-- [Instrucciones del Desafío](file:///g:/BCP/Desaf%C3%ADo%20t%C3%A9cnico/entry_task_bcp/Instructions.md)
+### 💾 Almacenamiento de Datos
+1.  **Datos Estructurados (SQLite)**: En esta versión, se utiliza SQLite para persistir `Transactions`, `CustomerProfiles`, `DecisionRecords` y `AuditEvents`. El ORM de Django asegura una transición fluida a bases de datos de grado de producción (como PostgreSQL) en el futuro.
+2.  **Datos No Estructurados (Amazon Bedrock KB)**: Las políticas de fraude se ingestan en un Knowledge Base de Bedrock, permitiendo búsquedas semánticas (RAG) sin necesidad de pre-procesar reglas rígidas.
+
+### 📜 Audit Trail (Trazabilidad)
+Cada decisión genera un rastro de auditoría inmutable:
+- **`DecisionRecord`**: Almacena el resultado final, el nivel de confianza (0-1), las señales detectadas y las citaciones exactas de políticas.
+- **`AuditEvent`**: Un log detallado que registra la "Ruta de Agentes" (ej: `Context -> Behavior -> RAG -> ...`) y los metadatos de cada interacción.
+- **Reportes PDF**: Se utiliza el **Patrón Factory** en `report_service.py` para generar reportes descargables que consolidan toda la evidencia técnica.
+
+---
+
+## 🔑 Gestión de Secretos y Seguridad
+
+El proyecto implementa prácticas recomendadas de seguridad en AWS:
+- **AWS Secrets Manager**: Almacena llaves sensibles como `TAVILY_API_KEY`, `LANGCHAIN_API_KEY` y `DJANGO_SECRET_KEY`. Esto evita que las llaves estén expuestas en el código o en variables de entorno locales.
+- **AWS Systems Manager (Parameter Store)**: Gestiona configuraciones de entorno (ej: `BEDROCK_KB_ID`, `DJANGO_DEBUG`) de forma centralizada.
+- **Gobierno de Búsqueda**: La búsqueda web a través de **Tavily** está limitada a una `allowlist` de dominios confiables (bcp.com.pe, gestion.pe, etc.), mitigando el riesgo de alucinaciones basadas en fuentes no oficiales.
+
+---
+
+## 🎨 Frontend y UI
+- **Arquitectura**: Basada en componentes funcionales de **React** y **Vite**.
+- **User Experience**: Dashboard dinámico que muestra métricas de salud del sistema, transacciones en tiempo real y una cola de gestión de casos (HITL) para que analistas humanos tomen decisiones finales en casos ambiguos.
+
+---
+
+## 🚀 Guías Complementarias
+- [Guía de Despliegue (AWS)](README_DEPLOY.md)
+- [Instrucciones Originales](Instructions.md)

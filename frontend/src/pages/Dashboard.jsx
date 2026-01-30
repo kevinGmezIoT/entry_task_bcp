@@ -98,6 +98,7 @@ function Dashboard() {
                         <tr>
                             <th className="px-6 py-4 font-semibold">ID Transacción</th>
                             <th className="px-6 py-4 font-semibold">Monto</th>
+                            <th className="px-6 py-4 font-semibold">Moneda</th>
                             <th className="px-6 py-4 font-semibold">Decisión IA</th>
                             <th className="px-6 py-4 font-semibold">Confianza</th>
                             <th className="px-6 py-4 font-semibold">Fecha/Hora</th>
@@ -108,7 +109,8 @@ function Dashboard() {
                         {transactions?.map((tx) => (
                             <tr key={tx.id} className="hover:bg-gray-50/80 transition-colors">
                                 <td className="px-6 py-4 font-medium text-gray-900">{tx.id}</td>
-                                <td className="px-6 py-4">${(tx.amount ?? 0).toLocaleString()}</td>
+                                <td className="px-6 py-4">{(tx.amount ?? 0).toLocaleString()}</td>
+                                <td className="px-6 py-4">{tx.currency}</td>
                                 <td className="px-6 py-4">
                                     <span className={`px-3 py-1 rounded-full text-xs font-bold ${getStatusColor(tx.decision)}`}>
                                         {tx.decision}

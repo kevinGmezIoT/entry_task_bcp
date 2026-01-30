@@ -69,7 +69,7 @@ function HITLQueue() {
                                     <span className="text-xs opacity-70">{new Date(c.created_at).toLocaleTimeString()}</span>
                                 </div>
                                 <p className={`text-sm ${selectedCase?.id === c.id ? 'text-blue-100' : 'text-gray-500'}`}>
-                                    Monto: ${c.transaction.amount} • Cliente: {c.transaction.customer.customer_id}
+                                    Monto: {c.transaction.amount} {c.transaction.currency || 'USD'} • Cliente: {c.transaction.customer.customer_id}
                                 </p>
                             </div>
                         ))

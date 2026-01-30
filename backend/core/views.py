@@ -262,6 +262,7 @@ def list_transactions(request):
         data.append({
             "id": d.transaction.transaction_id,
             "amount": d.transaction.amount,
+            "currency": d.transaction.currency,
             "decision": d.decision,
             "confidence": d.confidence,
             "timestamp": d.created_at.strftime("%Y-%m-%d %H:%M")

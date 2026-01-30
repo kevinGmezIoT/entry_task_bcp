@@ -22,7 +22,6 @@ function Sidebar() {
         { path: '/', name: 'Dashboard', icon: LayoutDashboard },
         { path: '/hitl', name: 'HITL Queue', icon: Inbox },
         { path: '/manual-entry', name: 'Manual Entry', icon: PlusCircle },
-        { path: '/simulator', name: 'Simulator', icon: PlayCircle },
         { path: '/reports', name: 'Audit Reports', icon: FileBarChart },
     ];
 
