@@ -132,10 +132,11 @@ class PipelineStack(Stack):
 
                             'echo Running Migrations and RAG Ingestion...',
                             'CLUSTER_NAME=$(aws cloudformation describe-stacks --stack-name EntryTaskBcpResources$ENVIRONMENT --query "Stacks[0].Outputs[?ExportName==\'EntryClusterName-$ENVIRONMENT\'].OutputValue" --output text)',
-                            'SERVICE_NAME=$(aws ecs list-services --cluster $CLUSTER_NAME --query "serviceArns[?contains(@, \'BackendService\')]" --output text | cut -d "/" -f 3)',
-                            
                             'echo "Forcing ECS redeploy to pull latest images..."',
+                            'SERVICE_NAME=$(aws ecs list-services --cluster $CLUSTER_NAME --query "serviceArns[?contains(@, \'BackendService\')]" --output text | cut -d "/" -f 3)',
                             'aws ecs update-service --cluster $CLUSTER_NAME --service $SERVICE_NAME --force-new-deployment',
+                            'AGENT_SERVICE_NAME=$(aws ecs list-services --cluster $CLUSTER_NAME --query "serviceArns[?contains(@, \'AgentsService\')]" --output text | cut -d "/" -f 3)',
+                            'aws ecs update-service --cluster $CLUSTER_NAME --service $AGENT_SERVICE_NAME --force-new-deployment',
                             
                             'TASK_DEFINITION=$(aws ecs describe-services --cluster $CLUSTER_NAME --services $SERVICE_NAME --query "services[0].taskDefinition" --output text)',
                             'VPC_ID=$(aws cloudformation describe-stacks --stack-name EntryTaskBcpResources$ENVIRONMENT --query "Stacks[0].Outputs[?ExportName==\'EntryVpcId-$ENVIRONMENT\'].OutputValue" --output text)',

@@ -133,6 +133,9 @@ class AppStack(Stack):
             health_check_grace_period=Duration.seconds(60)
         )
 
+        # Set ALB idle timeout to 300s for long AI calls
+        backend_service.load_balancer.set_attribute("idle_timeout.timeout_seconds", "300")
+
         backend_service.target_group.configure_health_check(
             path="/api/health/",
             interval=Duration.seconds(30),
@@ -197,7 +200,11 @@ class AppStack(Stack):
             ),
             additional_behaviors={
                 "/api/*": cloudfront.BehaviorOptions(
-                    origin=origins.HttpOrigin(backend_service.load_balancer.load_balancer_dns_name, protocol_policy=cloudfront.OriginProtocolPolicy.HTTP_ONLY),
+                    origin=origins.HttpOrigin(
+                        backend_service.load_balancer.load_balancer_dns_name, 
+                        protocol_policy=cloudfront.OriginProtocolPolicy.HTTP_ONLY,
+                        read_timeout=Duration.seconds(300)
+                    ),
                     viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
                     allowed_methods=cloudfront.AllowedMethods.ALLOW_ALL,
                     cache_policy=cloudfront.CachePolicy.CACHING_DISABLED,
