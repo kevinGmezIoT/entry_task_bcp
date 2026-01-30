@@ -1,4 +1,5 @@
 import os
+import concurrent.futures
 from typing import Annotated, List, Dict, Any, TypedDict
 from langgraph.graph import StateGraph, END
 from langchain_aws import ChatBedrock
@@ -23,8 +24,15 @@ class AgentState(TypedDict):
     explanation_audit: str
 
 # --- LLM Setup ---
-llm = ChatBedrock(
-    model_id="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+# Sonnet for complex reasoning (Debate, Arbiter)
+sonnet_llm = ChatBedrock(
+    model_id="us.anthropic.claude-3-5-sonnet-20240620-v1:0",
+    model_kwargs={"temperature": 0}
+)
+
+# Haiku for faster processing (Aggregation, Explainability)
+haiku_llm = ChatBedrock(
+    model_id="us.anthropic.claude-3-haiku-20240307-v1:0",
     model_kwargs={"temperature": 0}
 )
 
@@ -151,14 +159,15 @@ def evidence_aggregation_agent(state: AgentState):
     IMPORTANTE: Usa Markdown estándar para el formato (**negrita**, # encabezados). NO uses etiquetas HTML.
     """
     
-    response = llm.invoke(prompt)
+    # Use Haiku for faster aggregation
+    response = haiku_llm.invoke(prompt)
     print(f" -> Summary generated ({len(response.content)} chars)")
     return {"aggregation": response.content}
 
 def debate_agents(state: AgentState):
-    """Genera argumentos Pro-Fraud vs Pro-Customer."""
+    """Genera argumentos Pro-Fraud vs Pro-Customer en paralelo."""
     agg = state["aggregation"]
-    print("[Agent] Debate: Generating arguments...")
+    print("[Agent] Debate: Generating arguments in parallel...")
     
     pro_fraud_prompt = f"""
     Actúa como un Investigador Forense de Fraude.
@@ -174,8 +183,14 @@ def debate_agents(state: AgentState):
     Considera falsos positivos, comportamiento atípico pero posible, y el impacto en la lealtad del cliente.
     """
     
-    pro_fraud = llm.invoke(pro_fraud_prompt).content
-    pro_customer = llm.invoke(pro_customer_prompt).content
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        # Use Sonnet for critical thinking
+        future_fraud = executor.submit(sonnet_llm.invoke, pro_fraud_prompt)
+        future_customer = executor.submit(sonnet_llm.invoke, pro_customer_prompt)
+        
+        pro_fraud = future_fraud.result().content
+        pro_customer = future_customer.result().content
+        
     print(" -> Pro-Fraud and Pro-Customer arguments ready.")
     
     return {"debate": {"pro_fraud": pro_fraud, "pro_customer": pro_customer}}
@@ -210,7 +225,8 @@ def decision_arbiter_agent(state: AgentState):
     REGLA HITL: Si después de analizar, tu confianza es menor a 0.6 o los argumentos son extremadamente contradictorios, la decisión real será ESCALATE_TO_HUMAN, pero primero indica qué inclinarías hacer.
     """
     
-    structured_llm = llm.with_structured_output(DecisionResponse)
+    # Use Sonnet for the final decision
+    structured_llm = sonnet_llm.with_structured_output(DecisionResponse)
     result = structured_llm.invoke(prompt)
     
     final_decision = result.decision
@@ -230,12 +246,12 @@ def decision_arbiter_agent(state: AgentState):
     }
 
 def explainability_agent(state: AgentState):
-    """Genera explicaciones para cliente y auditoría."""
+    """Genera explicaciones para cliente y auditoría en paralelo."""
     decision = state["decision"]
     signals = state["signals"]
     reasoning = state["explanation_audit"]
     
-    print("[Agent] Explainability: Generating natural language reports...")
+    print("[Agent] Explainability: Generating natural language reports in parallel...")
     
     customer_prompt = f"""
     Actúa como un asistente de servicio al cliente del BCP.
@@ -251,7 +267,7 @@ def explainability_agent(state: AgentState):
     """
     
     # Reconstructing the agent path for audit
-    agent_path = "Context -> Behavior -> RAG -> Web -> Aggregation -> Debate -> Arbiter -> Explainability"
+    agent_path = "Context -> Behavior -> (RAG || Web) -> Aggregation -> (Pro-Fraud || Pro-Customer) -> Arbiter -> (Cust-Exp || Audit-Exp)"
     
     audit_prompt = f"""
     Actúa como un Auditor de Seguridad de IA.
@@ -271,8 +287,14 @@ def explainability_agent(state: AgentState):
     - NO generes tablas en texto, describe los datos en formato de lista o párrafo.
     """
     
-    exp_cust = llm.invoke(customer_prompt).content
-    exp_audit = llm.invoke(audit_prompt).content
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        # Use Haiku for faster reports
+        future_cust = executor.submit(haiku_llm.invoke, customer_prompt)
+        future_audit = executor.submit(haiku_llm.invoke, audit_prompt)
+        
+        exp_cust = future_cust.result().content
+        exp_audit = future_audit.result().content
+        
     print(" -> Explanations generated.")
     
     return {"explanation_customer": exp_cust, "explanation_audit": exp_audit}
@@ -292,12 +314,21 @@ def create_graph():
     workflow.add_node("arbiter", decision_arbiter_agent)
     workflow.add_node("explain", explainability_agent)
     
-    # Define edges (Sequential as requested)
+    # Define edges with Parallel Execution:
+    # workflow.set_entry_point("context")
+    # context -> behavior -> [rag, web] -> aggregation -> debate -> arbiter -> explain -> END
+    
     workflow.set_entry_point("context")
     workflow.add_edge("context", "behavior")
+    
+    # Parallelize RAG and Web Search
     workflow.add_edge("behavior", "rag")
-    workflow.add_edge("rag", "web")
+    workflow.add_edge("behavior", "web")
+    
+    # Both must finish before aggregation
+    workflow.add_edge("rag", "aggregation")
     workflow.add_edge("web", "aggregation")
+    
     workflow.add_edge("aggregation", "debate")
     workflow.add_edge("debate", "arbiter")
     workflow.add_edge("arbiter", "explain")

@@ -5,7 +5,7 @@ const api = axios.create({
     headers: {
         'Content-Type': 'application/json',
     },
-    timeout: 300000, // 5 minutes for long LLM calls
+    timeout: 60000, // 1 minute (CloudFront standard max limit)
 });
 
 export default api;
