@@ -90,4 +90,3 @@ El proyecto implementa prácticas recomendadas de seguridad en AWS:
 
 ## 🚀 Guías Complementarias
 - [Guía de Despliegue (AWS)](README_DEPLOY.md)
-- [Instrucciones Originales](Instructions.md)

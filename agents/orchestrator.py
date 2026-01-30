@@ -32,7 +32,7 @@ sonnet_llm = ChatBedrock(
 
 # Haiku for faster processing (Aggregation, Explainability)
 haiku_llm = ChatBedrock(
-    model_id="us.anthropic.claude-3-haiku-20240307-v1:0",
+    model_id="us.anthropic.claude-3-5-haiku-20241022-v1:0",
     model_kwargs={"temperature": 0}
 )
 
@@ -145,7 +145,7 @@ def evidence_aggregation_agent(state: AgentState):
     SEÑALES DETECTADAS:
     {signals}
     
-    EVIDENCIA INTERNA (RAG):
+    POLÍTICAS INTERNAS (RAG):
     {internal_str}
     
     CONTEXTO DE TRANSACCIÓN:
@@ -154,7 +154,7 @@ def evidence_aggregation_agent(state: AgentState):
     PERFIL HABITUAL DEL CLIENTE:
     {state['customer']}
     
-    Resume los hallazgos clave de manera objetiva, resaltando conflictos entre la conducta del cliente y las políticas o alertas externas.
+    Resume los hallazgos clave de manera objetiva, resaltando conflictos entre la conducta del cliente y las políticas o alertas externas. Usa las políticas para brindar resultados comparando el contexto de la transacción con las transacciones habituales del usuario.
     TEN EN CUENTA LA MONEDA: Asegúrate de mencionar la moneda correcta ({tx.get('currency', 'PEN')}) al referirte a montos. NO asumas que es USD si la transacción indica otra moneda.
     IMPORTANTE: Usa Markdown estándar para el formato (**negrita**, # encabezados). NO uses etiquetas HTML.
     """
