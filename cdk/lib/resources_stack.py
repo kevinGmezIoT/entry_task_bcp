@@ -8,6 +8,7 @@ from aws_cdk import (
     aws_s3 as s3,
     aws_ssm as ssm,
     aws_iam as iam,
+    aws_cloudfront as cloudfront,
     RemovalPolicy
 )
 
@@ -35,8 +36,12 @@ class ResourcesStack(Stack):
 
         # 2. ECS Cluster
         self.cluster = ecs.Cluster(self, "EntryTaskCluster",
-            vpc=self.vpc
+            vpc=self.vpc,
+            default_cloud_map_namespace=ecs.CloudMapNamespaceOptions(
+                name="local"
+            )
         )
+
 
         # 3. ECR Repositories
         self.backend_repository = ecr.Repository(self, "BackendRepo",
@@ -61,6 +66,9 @@ class ResourcesStack(Stack):
             auto_delete_objects=True
         )
 
+        self.origin_access_identity = cloudfront.OriginAccessIdentity(self, "OAI")
+        self.frontend_bucket.grant_read(self.origin_access_identity)
+
         # 5. S3 Bucket for RAG Policies
         self.policy_bucket = s3.Bucket(self, "PolicyBucket",
             removal_policy=RemovalPolicy.DESTROY,
@@ -75,4 +83,5 @@ class ResourcesStack(Stack):
         CfnOutput(self, "AgentsRepoName", value=self.agents_repository.repository_name, export_name="EntryAgentsRepoName-" + environment)
         CfnOutput(self, "FrontendBucketName", value=self.frontend_bucket.bucket_name, export_name="EntryFrontendBucketName-" + environment)
         CfnOutput(self, "PolicyBucketName", value=self.policy_bucket.bucket_name, export_name="EntryPolicyBucketName-" + environment)
+        CfnOutput(self, "OaiId", value=self.origin_access_identity.origin_access_identity_id, export_name="EntryOaiId-" + environment)
 

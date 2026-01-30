@@ -79,6 +79,7 @@ class PipelineStack(Stack):
                 'BACKEND_REPO_NAME': codebuild.BuildEnvironmentVariable(value=backend_repo_name),
                 'AGENTS_REPO_NAME': codebuild.BuildEnvironmentVariable(value=agents_repo_name),
                 'FRONTEND_BUCKET_NAME': codebuild.BuildEnvironmentVariable(value=frontend_bucket_name),
+                'ENVIRONMENT': codebuild.BuildEnvironmentVariable(value=self.__environment),
             },
             build_spec=codebuild.BuildSpec.from_object({
                 'version': '0.2',
@@ -124,6 +125,16 @@ class PipelineStack(Stack):
                             
                             'echo Deploying CDK stacks...',
                             'cdk deploy --all --app "python cdk/main.py" --require-approval never -c environment=' + self.__environment,
+                            
+                            'echo Running Migrations and RAG Ingestion...',
+                            'CLUSTER_NAME=$(aws cloudformation describe-stacks --stack-name EntryTaskBcpResources$ENVIRONMENT --query "Stacks[0].Outputs[?ExportName==\'EntryClusterName-$ENVIRONMENT\'].OutputValue" --output text)',
+                            'TASK_DEFINITION=$(aws ecs list-task-definitions --family-prefix EntryTaskBcp$ENVIRONMENT-BackendServiceBackendTaskDef --sort DESC --query "taskDefinitionArns[0]" --output text)',
+                            'VPC_ID=$(aws cloudformation describe-stacks --stack-name EntryTaskBcpResources$ENVIRONMENT --query "Stacks[0].Outputs[?ExportName==\'EntryVpcId-$ENVIRONMENT\'].OutputValue" --output text)',
+                            'SUBNETS=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC_ID" "Name=tag:Name,Values=*Public*" --query "Subnets[*].SubnetId" --output text | sed "s/\\t/,/g")',
+                            'SG_ID=$(aws ecs describe-services --cluster $CLUSTER_NAME --services EntryTaskBcp$ENVIRONMENT-BackendServiceBackendService --query "services[0].networkConfiguration.awsvpcConfiguration.securityGroups[0]" --output text)',
+                            
+                            'aws ecs run-task --cluster $CLUSTER_NAME --task-definition $TASK_DEFINITION --launch-type FARGATE --network-configuration "awsvpcConfiguration={subnets=[$SUBNETS],securityGroups=[$SG_ID],assignPublicIp=ENABLED}" --overrides "{\\\"containerOverrides\\\": [{\\\"name\\\": \\\"BackendContainer\\\", \\\"command\\\": [\\\"python\\\", \\\"manage.py\\\", \\\"seed_data\\\"]}]}"',
+                            'aws ecs run-task --cluster $CLUSTER_NAME --task-definition $TASK_DEFINITION --launch-type FARGATE --network-configuration "awsvpcConfiguration={subnets=[$SUBNETS],securityGroups=[$SG_ID],assignPublicIp=ENABLED}" --overrides "{\\\"containerOverrides\\\": [{\\\"name\\\": \\\"BackendContainer\\\", \\\"command\\\": [\\\"python\\\", \\\"manage.py\\\", \\\"ingest_rag\\\"]}]}"'
                         ]
                     },
                 }

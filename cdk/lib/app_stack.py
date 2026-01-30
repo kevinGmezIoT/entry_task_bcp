@@ -13,6 +13,7 @@ from aws_cdk import (
     aws_cloudfront as cloudfront,
     aws_cloudfront_origins as origins,
     aws_s3 as s3,
+    aws_servicediscovery as servicediscovery,
     CfnOutput
 )
 
@@ -27,7 +28,9 @@ class AppStack(Stack):
                  agents_repository=None,
                  frontend_bucket=None,
                  policy_bucket=None,
+                 origin_access_identity=None,
                  **kwargs
+
                  ) -> None:
         super().__init__(scope, id, **kwargs)
 
@@ -91,7 +94,7 @@ class AppStack(Stack):
             "DATABASE_URL": ssm.StringParameter.value_for_string_parameter(self, f"/entry-task/{environment}/database-url"),
             "S3_POLICY_BUCKET": policy_bucket.bucket_name,
             "AWS_REGION": Stack.of(self).region,
-            "AGENTS_SERVICE_URL": "http://agents.local:5001", # Placeholder, will be updated if using Service Discovery
+            "AGENTS_SERVICE_URL": "http://agents.local:5001",
         }
 
         # Agents specific env from Parameter Store
@@ -147,7 +150,7 @@ class AppStack(Stack):
             assign_public_ip=True,
             cloud_map_options=ecs.CloudMapOptions(
                 name="agents",
-                dns_record_type=ec2.DnsRecordType.A,
+                dns_record_type=servicediscovery.DnsRecordType.A,
                 dns_ttl=Duration.seconds(60)
             )
         )
@@ -161,20 +164,26 @@ class AppStack(Stack):
 
         # Health checks
         backend_service.target_group.configure_health_check(
-            path="/health/",
+            path="/api/health/",
             interval=Duration.seconds(30)
         )
 
         # 4. CloudFront for Frontend
-        origin_access_identity = cloudfront.OriginAccessIdentity(self, "OAI")
-        frontend_bucket.grant_read(origin_access_identity)
+        if origin_access_identity is None:
+            origin_access_identity = cloudfront.OriginAccessIdentity.from_origin_access_identity_id(
+                self, "OAI", Fn.import_value("EntryOaiId-" + environment)
+            )
 
         distribution = cloudfront.Distribution(self, "FrontendDistribution",
             default_root_object="index.html",
             default_behavior=cloudfront.BehaviorOptions(
-                origin=origins.S3Origin(frontend_bucket, origin_access_identity=origin_access_identity),
+                origin=origins.S3BucketOrigin.with_origin_access_identity(
+                    frontend_bucket,
+                    origin_access_identity=origin_access_identity
+                ),
                 viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS
             ),
+            price_class=cloudfront.PriceClass.PRICE_CLASS_100,
             error_responses=[
                 cloudfront.ErrorResponse(
                     http_status=404,
@@ -188,6 +197,7 @@ class AppStack(Stack):
                 )
             ]
         )
+
 
         # 5. IAM Permissions and Outputs
         # Grant permissions to Backend for S3 and Bedrock

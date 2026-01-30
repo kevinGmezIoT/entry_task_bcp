@@ -1,6 +1,9 @@
 stack = 'EntryTaskBcp'
-aws_account = '495297548455'
+aws_account = '940583586544'
 configuration_by_environment = {
+    'LOCAL': {
+        'region': 'us-east-2',
+    },
     'DEV': {
         'region': 'us-east-2',
     },

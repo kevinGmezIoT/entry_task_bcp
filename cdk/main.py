@@ -26,6 +26,7 @@ app_stack = AppStack(app, stack_name(environment),
     agents_repository=resources_stack.agents_repository,
     frontend_bucket=resources_stack.frontend_bucket,
     policy_bucket=resources_stack.policy_bucket,
+    origin_access_identity=resources_stack.origin_access_identity,
     env=CdkEnvironment(account=aws_account, region=aws_region(environment)),
 )
 
